@@ -1,0 +1,3 @@
+DOMAIN = "domain_monitor"
+DEFAULT_SCAN_INTERVAL = 300
+TIMEOUT = 10
