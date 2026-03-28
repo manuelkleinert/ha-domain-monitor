@@ -29,6 +29,7 @@ class DomainSensor(Entity):
             
         self._attr_name = name
         self._attr_unique_id = uid.replace(".", "_")
+        self._attr_icon = "mdi:web" if service["type"] == "http" else "mdi:lan"
 
     @property
     def state(self):

@@ -38,10 +38,18 @@ class DomainDataCoordinator(DataUpdateCoordinator):
                 })
 
             elif len(parts) == 3:
+                try:
+                    port = int(parts[2])
+                except ValueError:
+                    _LOGGER.warning(
+                        "Skipping invalid service entry (port is not a number): %s",
+                        item.strip(),
+                    )
+                    continue
                 self.services.append({
                     "type": "tcp",
                     "host": parts[0],
-                    "port": int(parts[2])
+                    "port": port,
                 })
 
         for s in self.services:
