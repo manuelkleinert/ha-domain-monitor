@@ -2,9 +2,11 @@
   "domain": "domain_monitor",
   "name": "Domain Monitor",
   "version": "1.0.0",
-  "documentation": "https://github.com/YOUR_GITHUB/domain-monitor",
-  "issue_tracker": "https://github.com/YOUR_GITHUB/domain-monitor/issues",
-  "requirements": ["aiohttp"],
+  "documentation": "https://github.com/manuelkleinert/ha-domain-monitor.git",
+  "issue_tracker": "https://github.com/manuelkleinert/ha-domain-monitor/issues",
+  "requirements": [
+    "aiohttp"
+  ],
   "dependencies": [],
   "codeowners": [],
   "config_flow": true,

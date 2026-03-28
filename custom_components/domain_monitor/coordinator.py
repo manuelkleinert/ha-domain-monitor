@@ -2,7 +2,13 @@ import aiohttp
 import asyncio
 from datetime import datetime, timedelta
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+import logging
+import socket
+
 from .const import DEFAULT_SCAN_INTERVAL, TIMEOUT
+
+_LOGGER = logging.getLogger(__name__)
+
 
 class DomainDataCoordinator(DataUpdateCoordinator):
 
@@ -12,50 +18,105 @@ class DomainDataCoordinator(DataUpdateCoordinator):
 
         super().__init__(
             hass,
-            logger=None,
+            logger=_LOGGER,
             name="domain_monitor",
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
 
-        self.domains = [
-            d.strip()
-            for d in entry.data.get("domains", "").split(",")
-            if d.strip()
-        ]
+        raw = entry.options.get("services", entry.data.get("services", ""))
 
-        self.history = {d: [] for d in self.domains}
+        self.services = []
+        self.history = {}
+
+        for item in raw.split(","):
+            parts = item.strip().split(":")
+
+            if len(parts) == 2:
+                self.services.append({
+                    "type": "http",
+                    "host": parts[0]
+                })
+
+            elif len(parts) == 3:
+                self.services.append({
+                    "type": "tcp",
+                    "host": parts[0],
+                    "port": int(parts[2])
+                })
+
+        for s in self.services:
+            self.history[s["host"]] = []
 
     async def _async_update_data(self):
         results = {}
 
         async with aiohttp.ClientSession() as session:
-            tasks = [self.check_domain(session, d) for d in self.domains]
+            tasks = []
+
+            for s in self.services:
+                if s["type"] == "http":
+                    tasks.append(self.check_http(session, s["host"]))
+
+                elif s["type"] == "tcp":
+                    tasks.append(self.check_tcp(s["host"], s["port"]))
+
             responses = await asyncio.gather(*tasks)
 
-        for domain, result in responses:
-            self.history[domain].append(result)
-            self.history[domain] = self.history[domain][-100:]
-            results[domain] = result
+        for item in responses:
+            host = item["host"]
+
+            self.history[host].append(item)
+            self.history[host] = self.history[host][-100:]
+
+            results[host] = item
 
         return results
 
-    async def check_domain(self, session, domain):
-        url = f"https://{domain}"
+    async def check_http(self, session, host):
+        url = f"https://{host}"
         start = datetime.utcnow()
 
         try:
             async with session.get(url, timeout=TIMEOUT) as resp:
-                end = datetime.utcnow()
-                return domain, {
+                return {
+                    "host": host,
                     "status": "up" if resp.status < 400 else "down",
                     "code": resp.status,
-                    "response_ms": (end - start).total_seconds() * 1000,
+                    "response_ms": (datetime.utcnow() - start).total_seconds() * 1000,
                     "time": start
                 }
+
         except Exception:
-            return domain, {
+            return {
+                "host": host,
                 "status": "down",
                 "code": None,
+                "response_ms": None,
+                "time": start
+            }
+
+    async def check_tcp(self, host, port):
+        start = datetime.utcnow()
+
+        try:
+            await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: socket.create_connection((host, port), timeout=TIMEOUT)
+            )
+
+            return {
+                "host": host,
+                "status": "up",
+                "code": port,
+                "response_ms": (datetime.utcnow() - start).total_seconds() * 1000,
+                "time": start
+            }
+
+        except Exception:
+            return {
+                "host": host,
+                "status": "down",
+                "code": port,
                 "response_ms": None,
                 "time": start
             }
