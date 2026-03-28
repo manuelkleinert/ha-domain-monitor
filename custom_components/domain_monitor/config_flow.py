@@ -12,41 +12,27 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(config_entry):
         return DomainMonitorOptionsFlowHandler(config_entry)
 
-    def __init__(self):
-        self.services = []
-
     async def async_step_user(self, user_input=None):
+        schema = vol.Schema({
+            vol.Required("host"): str,
+            vol.Required("type", default="http"): vol.In(["http", "tcp"]),
+            vol.Optional("port", default=443): int,
+        })
+
         if user_input is not None:
             host = user_input["host"].strip()
             check_type = user_input["type"]
             port = user_input.get("port", 443)
 
             if check_type == "http":
-                self.services.append(f"{host}:http")
+                service = f"{host}:http"
             else:
-                self.services.append(f"{host}:tcp:{port}")
-
-            if user_input.get("add_another", False):
-                return await self.async_step_user()
-
-            services_str = ",".join(self.services)
-
-            if len(self.services) == 1:
-                title = self.services[0]
-            else:
-                title = f"{self.services[0]} (+{len(self.services)-1} weitere)"
+                service = f"{host}:tcp:{port}"
 
             return self.async_create_entry(
-                title=title,
-                data={"services": services_str}
+                title=service,
+                data={"services": service}
             )
-
-        schema = vol.Schema({
-            vol.Required("host"): str,
-            vol.Required("type", default="http"): vol.In(["http", "tcp"]),
-            vol.Optional("port", default=443): int,
-            vol.Optional("add_another", default=False): bool,
-        })
 
         return self.async_show_form(step_id="user", data_schema=schema)
 
