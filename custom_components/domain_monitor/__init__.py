@@ -3,7 +3,7 @@ from homeassistant.core import HomeAssistant
 
 from .coordinator import DomainDataCoordinator
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "button", "binary_sensor"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
