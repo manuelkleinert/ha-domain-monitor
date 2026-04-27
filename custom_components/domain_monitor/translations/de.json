@@ -3,11 +3,12 @@
     "step": {
       "user": {
         "title": "Domain Monitor",
+        "description": "Prüfe die Erreichbarkeit deiner Webseite oder deines Servers. Du kannst optional ein Suchwort oder einen regulären Ausdruck (Regex) angeben, um den Inhalt zu verifizieren (z.B. <footer>mk</footer>).",
         "data": {
           "host": "Hostname / IP",
           "type": "Prüf-Typ",
           "port": "Port",
-          "keyword": "Suchwort (Regex)"
+          "keyword": "Suchwort / Regex (optional)"
         }
       }
     }
@@ -19,15 +20,6 @@
         "data": {
           "services": "Dienste (host:typ oder host:tcp:port)"
         }
-      }
-    }
-  },
-  "selector": {
-    "check_type": {
-      "options": {
-        "https": "Webseite (HTTPS)",
-        "http": "Webseite (HTTP)",
-        "tcp": "Netzwerk-Port (TCP)"
       }
     }
   }

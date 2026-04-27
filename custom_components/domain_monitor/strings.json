@@ -3,11 +3,12 @@
     "step": {
       "user": {
         "title": "Domain Monitor",
+        "description": "Check the availability of your website or server. Optionally, you can specify a keyword or Regex to verify the content.",
         "data": {
           "host": "Hostname / IP",
-          "type": "Type",
+          "type": "Check Type",
           "port": "Port",
-          "keyword": "Keyword (Regex)"
+          "keyword": "Keyword / Regex (optional)"
         }
       }
     }
@@ -19,15 +20,6 @@
         "data": {
           "services": "Services (host:type or host:tcp:port)"
         }
-      }
-    }
-  },
-  "selector": {
-    "check_type": {
-      "options": {
-        "https": "Website (HTTPS)",
-        "http": "Website (HTTP)",
-        "tcp": "Network Port (TCP)"
       }
     }
   }
