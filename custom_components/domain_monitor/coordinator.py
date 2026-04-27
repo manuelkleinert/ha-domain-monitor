@@ -32,16 +32,33 @@ class DomainDataCoordinator(DataUpdateCoordinator):
         self.history = {}
 
         for item in raw.split(","):
-            # Nutze maxsplit=2, damit Doppelpunkte im Keyword erlaubt sind
-            parts = item.strip().split(":", 2)
+            # Nutze maxsplit=3, um host:type:port:keyword zu unterstützen
+            parts = item.strip().split(":", 3)
 
             if len(parts) >= 2:
+                host = parts[0]
                 service_type = parts[1]
+                
                 if service_type in ["http", "https"]:
+                    # Legacy: host:type:keyword (3 parts)
+                    # New: host:type:port:keyword (4 parts)
+                    port = None
+                    keyword = None
+                    
+                    if len(parts) == 3:
+                        keyword = parts[2]
+                    elif len(parts) == 4:
+                        try:
+                            port = int(parts[2])
+                        except ValueError:
+                            port = None
+                        keyword = parts[3]
+                    
                     self.services.append({
                         "type": service_type,
-                        "host": parts[0],
-                        "keyword": parts[2] if len(parts) > 2 else None
+                        "host": host,
+                        "port": port,
+                        "keyword": keyword if keyword else None
                     })
                 elif service_type == "tcp" and len(parts) >= 3:
                     try:
@@ -54,7 +71,7 @@ class DomainDataCoordinator(DataUpdateCoordinator):
                         continue
                     self.services.append({
                         "type": "tcp",
-                        "host": parts[0],
+                        "host": host,
                         "port": port,
                     })
 
@@ -68,7 +85,7 @@ class DomainDataCoordinator(DataUpdateCoordinator):
 
         for s in self.services:
             if s["type"] in ["http", "https"]:
-                tasks.append(self.check_http(session, s["host"], s["type"], s.get("keyword")))
+                tasks.append(self.check_http(session, s["host"], s["type"], s.get("port"), s.get("keyword")))
 
             elif s["type"] == "tcp":
                 tasks.append(self.check_tcp(s["host"], s["port"]))
@@ -83,9 +100,15 @@ class DomainDataCoordinator(DataUpdateCoordinator):
 
         return results
 
-    async def check_http(self, session, host, proto, keyword=None):
+    async def check_http(self, session, host, proto, port=None, keyword=None):
         timestamp = int(datetime.now(UTC).timestamp())
-        url = f"{proto}://{host}?t={timestamp}"
+        
+        # Build URL with optional port
+        if port:
+            url = f"{proto}://{host}:{port}?t={timestamp}"
+        else:
+            url = f"{proto}://{host}?t={timestamp}"
+            
         start = datetime.now(UTC)
 
         headers = {

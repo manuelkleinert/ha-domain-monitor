@@ -16,22 +16,31 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema = vol.Schema({
             vol.Required("host"): str,
             vol.Required("type", default="https"): vol.In(["https", "http", "tcp"]),
-            vol.Optional("port", default=443): int,
+            vol.Optional("port"): int,
             vol.Optional("keyword"): str,
         })
 
         if user_input is not None:
             host = user_input["host"].strip()
             check_type = user_input["type"]
-            port = user_input.get("port", 443)
             keyword = user_input.get("keyword", "").strip()
+            
+            # Default ports if not specified
+            port = user_input.get("port")
+            if not port:
+                if check_type == "https":
+                    port = 443
+                elif check_type == "http":
+                    port = 80
+                else:
+                    port = 0
 
             if check_type in ["http", "https"]:
+                # Save as host:type:port:keyword
+                service = f"{host}:{check_type}:{port}:{keyword}"
                 if keyword:
-                    service = f"{host}:{check_type}:{keyword}"
                     display_title = f"{host} ({check_type} + Regex)"
                 else:
-                    service = f"{host}:{check_type}"
                     display_title = f"{host} ({check_type})"
             else:
                 service = f"{host}:tcp:{port}"
@@ -53,16 +62,18 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             host = user_input["host"].strip()
             check_type = user_input["type"]
-            port = user_input.get("port", 443)
             keyword = user_input.get("keyword", "").strip()
+            
+            port = user_input.get("port")
+            if not port:
+                if check_type == "https":
+                    port = 443
+                elif check_type == "http":
+                    port = 80
 
             if check_type in ["http", "https"]:
-                if keyword:
-                    service = f"{host}:{check_type}:{keyword}"
-                    title = f"{host} ({check_type} + Regex)"
-                else:
-                    service = f"{host}:{check_type}"
-                    title = f"{host} ({check_type})"
+                service = f"{host}:{check_type}:{port}:{keyword}"
+                title = f"{host} ({check_type}{' + Regex' if keyword else ''})"
             else:
                 service = f"{host}:tcp:{port}"
                 title = f"{host} (Port {port})"
@@ -77,9 +88,9 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
             "services", self._entry.data.get("services", "")
         )
 
-        # Parse existing service (take the first one if multiple exist)
+        # Parse existing service
         first_service = current_services.split(",")[0].strip()
-        parts = first_service.split(":", 2)
+        parts = first_service.split(":", 3)
 
         host = parts[0]
         check_type = "https"
@@ -89,13 +100,22 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
         if len(parts) >= 2:
             check_type = parts[1]
             if check_type in ["http", "https"]:
-                if len(parts) > 2:
+                if len(parts) == 3:
+                    # Legacy format: host:type:keyword
                     keyword = parts[2]
-            elif check_type == "tcp" and len(parts) > 2:
+                    port = 443 if check_type == "https" else 80
+                elif len(parts) == 4:
+                    # New format: host:type:port:keyword
+                    try:
+                        port = int(parts[2])
+                    except ValueError:
+                        port = 443 if check_type == "https" else 80
+                    keyword = parts[3]
+            elif check_type == "tcp" and len(parts) >= 3:
                 try:
                     port = int(parts[2])
                 except ValueError:
-                    pass
+                    port = 0
 
         schema = vol.Schema({
             vol.Required("host", default=host): str,
