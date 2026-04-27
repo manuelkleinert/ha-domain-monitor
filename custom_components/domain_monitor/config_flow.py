@@ -15,26 +15,30 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         schema = vol.Schema({
             vol.Required("host"): str,
-            vol.Required("type", default="https"): vol.In({
-                "https": "Webseite (HTTPS)",
-                "http": "Webseite (HTTP)",
-                "tcp": "Netzwerk-Port (TCP)"
-            }),
+            vol.Required("type", default="https"): vol.In(["https", "http", "tcp"]),
             vol.Optional("port", default=443): int,
+            vol.Optional("keyword"): str,
         })
 
         if user_input is not None:
             host = user_input["host"].strip()
             check_type = user_input["type"]
             port = user_input.get("port", 443)
+            keyword = user_input.get("keyword", "").strip()
 
             if check_type in ["http", "https"]:
-                service = f"{host}:{check_type}"
+                if keyword:
+                    service = f"{host}:{check_type}:{keyword}"
+                    display_title = f"{host} ({check_type} + Regex)"
+                else:
+                    service = f"{host}:{check_type}"
+                    display_title = f"{host} ({check_type})"
             else:
                 service = f"{host}:tcp:{port}"
+                display_title = f"{host} (Port {port})"
 
             return self.async_create_entry(
-                title=service,
+                title=display_title,
                 data={"services": service}
             )
 
@@ -53,9 +57,19 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
             if not services_list:
                 title = "Domain Monitor"
             elif len(services_list) == 1:
-                title = services_list[0]
+                # Schönere Titel-Logik auch hier anwenden
+                parts = services_list[0].split(":")
+                host = parts[0]
+                if len(parts) >= 2:
+                    proto = parts[1]
+                    if proto in ["http", "https"]:
+                        title = f"{host} ({proto}{' + Regex' if len(parts) > 2 else ''})"
+                    else:
+                        title = f"{host} (Port {parts[2]})"
+                else:
+                    title = host
             else:
-                title = f"{services_list[0]} (+{len(services_list)-1} weitere)"
+                title = f"{services_list[0].split(':')[0]} (+{len(services_list)-1} weitere)"
 
             self.hass.config_entries.async_update_entry(
                 self._entry, title=title

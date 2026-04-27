@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Domain Monitor",
+        "data": {
+          "host": "Hostname / IP",
+          "type": "Check Type",
+          "port": "Port",
+          "keyword": "Keyword (Regex)"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Settings",
+        "data": {
+          "services": "Services (host:type or host:tcp:port)"
+        }
+      }
+    }
+  },
+  "selector": {
+    "check_type": {
+      "options": {
+        "https": "Website (HTTPS)",
+        "http": "Website (HTTP)",
+        "tcp": "Network Port (TCP)"
+      }
+    }
+  }
+}

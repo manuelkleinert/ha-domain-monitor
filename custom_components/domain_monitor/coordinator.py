@@ -1,9 +1,12 @@
-import aiohttp
 import asyncio
-from datetime import datetime, timedelta
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from datetime import datetime, UTC, timedelta
 import logging
 import socket
+import re
+
+import aiohttp
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import DEFAULT_SCAN_INTERVAL, TIMEOUT
 
@@ -29,63 +32,61 @@ class DomainDataCoordinator(DataUpdateCoordinator):
         self.history = {}
 
         for item in raw.split(","):
-            parts = item.strip().split(":")
+            # Nutze maxsplit=2, damit Doppelpunkte im Keyword erlaubt sind
+            parts = item.strip().split(":", 2)
 
-            if len(parts) == 2:
-                # Typ kann 'http' oder 'https' sein
-                self.services.append({
-                    "type": parts[1],
-                    "host": parts[0]
-                })
-
-            elif len(parts) == 3:
-                try:
-                    port = int(parts[2])
-                except ValueError:
-                    _LOGGER.warning(
-                        "Skipping invalid service entry (port is not a number): %s",
-                        item.strip(),
-                    )
-                    continue
-                self.services.append({
-                    "type": "tcp",
-                    "host": parts[0],
-                    "port": port,
-                })
+            if len(parts) >= 2:
+                service_type = parts[1]
+                if service_type in ["http", "https"]:
+                    self.services.append({
+                        "type": service_type,
+                        "host": parts[0],
+                        "keyword": parts[2] if len(parts) > 2 else None
+                    })
+                elif service_type == "tcp" and len(parts) >= 3:
+                    try:
+                        port = int(parts[2])
+                    except ValueError:
+                        _LOGGER.warning(
+                            "Skipping invalid service entry (port is not a number): %s",
+                            item.strip(),
+                        )
+                        continue
+                    self.services.append({
+                        "type": "tcp",
+                        "host": parts[0],
+                        "port": port,
+                    })
 
         for s in self.services:
             self.history[s["host"]] = []
 
     async def _async_update_data(self):
         results = {}
+        session = async_get_clientsession(self.hass)
+        tasks = []
 
-        async with aiohttp.ClientSession() as session:
-            tasks = []
+        for s in self.services:
+            if s["type"] in ["http", "https"]:
+                tasks.append(self.check_http(session, s["host"], s["type"], s.get("keyword")))
 
-            for s in self.services:
-                if s["type"] in ["http", "https"]:
-                    tasks.append(self.check_http(session, s["host"], s["type"]))
+            elif s["type"] == "tcp":
+                tasks.append(self.check_tcp(s["host"], s["port"]))
 
-                elif s["type"] == "tcp":
-                    tasks.append(self.check_tcp(s["host"], s["port"]))
-
-            responses = await asyncio.gather(*tasks)
+        responses = await asyncio.gather(*tasks)
 
         for item in responses:
             host = item["host"]
-
             self.history[host].append(item)
             self.history[host] = self.history[host][-100:]
-
             results[host] = item
 
         return results
 
-    async def check_http(self, session, host, proto):
-        # Cache-Busting: Zeitstempel hinzufügen, um Cloudflare-Cache zu umgehen
-        timestamp = int(datetime.utcnow().timestamp())
+    async def check_http(self, session, host, proto, keyword=None):
+        timestamp = int(datetime.now(UTC).timestamp())
         url = f"{proto}://{host}?t={timestamp}"
-        start = datetime.utcnow()
+        start = datetime.now(UTC)
 
         headers = {
             "User-Agent": "HomeAssistant-DomainMonitor/1.0",
@@ -95,15 +96,31 @@ class DomainDataCoordinator(DataUpdateCoordinator):
 
         try:
             async with session.get(url, timeout=TIMEOUT, headers=headers) as resp:
+                status = "down"
+                
+                if resp.status < 400:
+                    status = "up"
+                    
+                    if keyword:
+                        content = await resp.text()
+                        try:
+                            if not re.search(keyword, content, re.IGNORECASE | re.DOTALL):
+                                status = "down"
+                                _LOGGER.debug("Regex '%s' not found in response from %s", keyword, host)
+                        except re.error as e:
+                            _LOGGER.error("Invalid Regex '%s' for host %s: %s", keyword, host, e)
+                            status = "down"
+
                 return {
                     "host": host,
-                    "status": "up" if resp.status < 400 else "down",
+                    "status": status,
                     "code": resp.status,
-                    "response_ms": (datetime.utcnow() - start).total_seconds() * 1000,
+                    "response_ms": (datetime.now(UTC) - start).total_seconds() * 1000,
                     "time": start
                 }
 
-        except Exception:
+        except Exception as e:
+            _LOGGER.debug("Error checking %s: %s", host, e)
             return {
                 "host": host,
                 "status": "down",
@@ -113,7 +130,7 @@ class DomainDataCoordinator(DataUpdateCoordinator):
             }
 
     async def check_tcp(self, host, port):
-        start = datetime.utcnow()
+        start = datetime.now(UTC)
 
         try:
             await asyncio.get_event_loop().run_in_executor(
@@ -125,7 +142,7 @@ class DomainDataCoordinator(DataUpdateCoordinator):
                 "host": host,
                 "status": "up",
                 "code": port,
-                "response_ms": (datetime.utcnow() - start).total_seconds() * 1000,
+                "response_ms": (datetime.now(UTC) - start).total_seconds() * 1000,
                 "time": start
             }
 
