@@ -51,38 +51,57 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         if user_input is not None:
-            services_str = user_input.get("services", "")
-            services_list = [s.strip() for s in services_str.split(",") if s.strip()]
-            
-            if not services_list:
-                title = "Domain Monitor"
-            elif len(services_list) == 1:
-                # Schönere Titel-Logik auch hier anwenden
-                parts = services_list[0].split(":")
-                host = parts[0]
-                if len(parts) >= 2:
-                    proto = parts[1]
-                    if proto in ["http", "https"]:
-                        title = f"{host} ({proto}{' + Regex' if len(parts) > 2 else ''})"
-                    else:
-                        title = f"{host} (Port {parts[2]})"
+            host = user_input["host"].strip()
+            check_type = user_input["type"]
+            port = user_input.get("port", 443)
+            keyword = user_input.get("keyword", "").strip()
+
+            if check_type in ["http", "https"]:
+                if keyword:
+                    service = f"{host}:{check_type}:{keyword}"
+                    title = f"{host} ({check_type} + Regex)"
                 else:
-                    title = host
+                    service = f"{host}:{check_type}"
+                    title = f"{host} ({check_type})"
             else:
-                title = f"{services_list[0].split(':')[0]} (+{len(services_list)-1} weitere)"
+                service = f"{host}:tcp:{port}"
+                title = f"{host} (Port {port})"
 
             self.hass.config_entries.async_update_entry(
                 self._entry, title=title
             )
-            
-            return self.async_create_entry(title="", data=user_input)
+
+            return self.async_create_entry(title="", data={"services": service})
 
         current_services = self._entry.options.get(
             "services", self._entry.data.get("services", "")
         )
 
+        # Parse existing service (take the first one if multiple exist)
+        first_service = current_services.split(",")[0].strip()
+        parts = first_service.split(":", 2)
+
+        host = parts[0]
+        check_type = "https"
+        port = 443
+        keyword = ""
+
+        if len(parts) >= 2:
+            check_type = parts[1]
+            if check_type in ["http", "https"]:
+                if len(parts) > 2:
+                    keyword = parts[2]
+            elif check_type == "tcp" and len(parts) > 2:
+                try:
+                    port = int(parts[2])
+                except ValueError:
+                    pass
+
         schema = vol.Schema({
-            vol.Required("services", default=current_services): str
+            vol.Required("host", default=host): str,
+            vol.Required("type", default=check_type): vol.In(["https", "http", "tcp"]),
+            vol.Optional("port", default=port): int,
+            vol.Optional("keyword", default=keyword): str,
         })
 
         return self.async_show_form(step_id="init", data_schema=schema)
