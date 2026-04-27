@@ -32,8 +32,9 @@ class DomainDataCoordinator(DataUpdateCoordinator):
             parts = item.strip().split(":")
 
             if len(parts) == 2:
+                # Typ kann 'http' oder 'https' sein
                 self.services.append({
-                    "type": "http",
+                    "type": parts[1],
                     "host": parts[0]
                 })
 
@@ -62,8 +63,8 @@ class DomainDataCoordinator(DataUpdateCoordinator):
             tasks = []
 
             for s in self.services:
-                if s["type"] == "http":
-                    tasks.append(self.check_http(session, s["host"]))
+                if s["type"] in ["http", "https"]:
+                    tasks.append(self.check_http(session, s["host"], s["type"]))
 
                 elif s["type"] == "tcp":
                     tasks.append(self.check_tcp(s["host"], s["port"]))
@@ -80,12 +81,20 @@ class DomainDataCoordinator(DataUpdateCoordinator):
 
         return results
 
-    async def check_http(self, session, host):
-        url = f"https://{host}"
+    async def check_http(self, session, host, proto):
+        # Cache-Busting: Zeitstempel hinzufügen, um Cloudflare-Cache zu umgehen
+        timestamp = int(datetime.utcnow().timestamp())
+        url = f"{proto}://{host}?t={timestamp}"
         start = datetime.utcnow()
 
+        headers = {
+            "User-Agent": "HomeAssistant-DomainMonitor/1.0",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+        }
+
         try:
-            async with session.get(url, timeout=TIMEOUT) as resp:
+            async with session.get(url, timeout=TIMEOUT, headers=headers) as resp:
                 return {
                     "host": host,
                     "status": "up" if resp.status < 400 else "down",

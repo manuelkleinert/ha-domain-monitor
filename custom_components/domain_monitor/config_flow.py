@@ -15,7 +15,11 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         schema = vol.Schema({
             vol.Required("host"): str,
-            vol.Required("type", default="http"): vol.In(["http", "tcp"]),
+            vol.Required("type", default="https"): vol.In({
+                "https": "Webseite (HTTPS)",
+                "http": "Webseite (HTTP)",
+                "tcp": "Netzwerk-Port (TCP)"
+            }),
             vol.Optional("port", default=443): int,
         })
 
@@ -24,8 +28,8 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             check_type = user_input["type"]
             port = user_input.get("port", 443)
 
-            if check_type == "http":
-                service = f"{host}:http"
+            if check_type in ["http", "https"]:
+                service = f"{host}:{check_type}"
             else:
                 service = f"{host}:tcp:{port}"
 
