@@ -16,7 +16,7 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema = vol.Schema({
             vol.Required("host"): str,
             vol.Required("type", default="https"): vol.In(["https", "http", "tcp"]),
-            vol.Optional("port", default=443): int,
+            vol.Optional("port"): int,
             vol.Optional("keyword"): str,
             vol.Optional("interval", default=DEFAULT_SCAN_INTERVAL): int,
             vol.Optional("timeout", default=TIMEOUT): int,
@@ -26,18 +26,27 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             host = user_input["host"].strip()
             check_type = user_input["type"]
-            port = user_input.get("port", 443)
             keyword = user_input.get("keyword", "").strip()
             interval = user_input.get("interval", DEFAULT_SCAN_INTERVAL)
             timeout = user_input.get("timeout", TIMEOUT)
             retries = user_input.get("retries", DEFAULT_RETRIES)
+            
+            # Default ports if not specified
+            port = user_input.get("port")
+            if not port:
+                if check_type == "https":
+                    port = 443
+                elif check_type == "http":
+                    port = 80
+                else:
+                    port = 0
 
             if check_type in ["http", "https"]:
+                # Save as host:type:port:keyword
+                service = f"{host}:{check_type}:{port}:{keyword}"
                 if keyword:
-                    service = f"{host}:{check_type}:{keyword}"
                     display_title = f"{host} ({check_type} + Regex)"
                 else:
-                    service = f"{host}:{check_type}"
                     display_title = f"{host} ({check_type})"
             else:
                 service = f"{host}:tcp:{port}"
@@ -62,31 +71,41 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         if user_input is not None:
-            services_str = user_input.get("services", "")
-            services_list = [s.strip() for s in services_str.split(",") if s.strip()]
+            host = user_input["host"].strip()
+            check_type = user_input["type"]
+            keyword = user_input.get("keyword", "").strip()
             
-            if not services_list:
-                title = "Domain Monitor"
-            elif len(services_list) == 1:
-                # Schönere Titel-Logik auch hier anwenden
-                parts = services_list[0].split(":")
-                host = parts[0]
-                if len(parts) >= 2:
-                    proto = parts[1]
-                    if proto in ["http", "https"]:
-                        title = f"{host} ({proto}{' + Regex' if len(parts) > 2 else ''})"
-                    else:
-                        title = f"{host} (Port {parts[2]})"
-                else:
-                    title = host
+            port = user_input.get("port")
+            if not port:
+                if check_type == "https":
+                    port = 443
+                elif check_type == "http":
+                    port = 80
+
+            interval = user_input.get("interval", DEFAULT_SCAN_INTERVAL)
+            timeout = user_input.get("timeout", TIMEOUT)
+            retries = user_input.get("retries", DEFAULT_RETRIES)
+
+            if check_type in ["http", "https"]:
+                service = f"{host}:{check_type}:{port}:{keyword}"
+                title = f"{host} ({check_type}{' + Regex' if keyword else ''})"
             else:
-                title = f"{services_list[0].split(':')[0]} (+{len(services_list)-1} weitere)"
+                service = f"{host}:tcp:{port}"
+                title = f"{host} (Port {port})"
 
             self.hass.config_entries.async_update_entry(
                 self._entry, title=title
             )
-            
-            return self.async_create_entry(title="", data=user_input)
+
+            return self.async_create_entry(
+                title="", 
+                data={
+                    "services": service,
+                    "interval": interval,
+                    "timeout": timeout,
+                    "retries": retries
+                }
+            )
 
         current_services = self._entry.options.get(
             "services", self._entry.data.get("services", "")
@@ -95,8 +114,40 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
         current_timeout = self._entry.options.get("timeout", self._entry.data.get("timeout", TIMEOUT))
         current_retries = self._entry.options.get("retries", self._entry.data.get("retries", DEFAULT_RETRIES))
 
+        # Parse existing service
+        first_service = current_services.split(",")[0].strip()
+        parts = first_service.split(":", 3)
+
+        host = parts[0]
+        check_type = "https"
+        port = 443
+        keyword = ""
+
+        if len(parts) >= 2:
+            check_type = parts[1]
+            if check_type in ["http", "https"]:
+                if len(parts) == 3:
+                    # Legacy format: host:type:keyword
+                    keyword = parts[2]
+                    port = 443 if check_type == "https" else 80
+                elif len(parts) == 4:
+                    # New format: host:type:port:keyword
+                    try:
+                        port = int(parts[2])
+                    except ValueError:
+                        port = 443 if check_type == "https" else 80
+                    keyword = parts[3]
+            elif check_type == "tcp" and len(parts) >= 3:
+                try:
+                    port = int(parts[2])
+                except ValueError:
+                    port = 0
+
         schema = vol.Schema({
-            vol.Required("services", default=current_services): str,
+            vol.Required("host", default=host): str,
+            vol.Required("type", default=check_type): vol.In(["https", "http", "tcp"]),
+            vol.Optional("port", default=port): int,
+            vol.Optional("keyword", default=keyword): str,
             vol.Optional("interval", default=current_interval): int,
             vol.Optional("timeout", default=current_timeout): int,
             vol.Optional("retries", default=current_retries): int,

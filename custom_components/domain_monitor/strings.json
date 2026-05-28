@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Domain Monitor",
-        "description": "Check the availability of your website or server. Optionally, you can specify a keyword or Regex to verify the content.",
+        "description": "Check the availability of your website or server. Optionally, you can specify a keyword or Regex to verify the content (e.g. `mk`).",
         "data": {
           "host": "Hostname / IP",
           "type": "Check Type",

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Domain Monitor",
-        "description": "Prüfe die Erreichbarkeit deiner Webseite oder deines Servers. Du kannst optional ein Suchwort oder einen regulären Ausdruck (Regex) angeben, um den Inhalt zu verifizieren (z.B. <footer>mk</footer>).",
+        "description": "Prüfe die Erreichbarkeit deiner Webseite oder deines Servers. Du kannst optional ein Suchwort oder einen regulären Ausdruck (Regex) angeben, um den Inhalt zu verifizieren.",
         "data": {
           "host": "Hostname / IP",
           "type": "Prüf-Typ",
