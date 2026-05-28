@@ -14,4 +14,4 @@ jobs:
       - name: HACS Action
         uses: hacs/action@main
       - name: Hassfest Validation
-        uses: home-assistant/hassfest@master
+        uses: home-assistant/actions/hassfest@master
