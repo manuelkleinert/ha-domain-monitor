@@ -8,7 +8,7 @@ import aiohttp
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DEFAULT_SCAN_INTERVAL, TIMEOUT
+from .const import DEFAULT_SCAN_INTERVAL, TIMEOUT, DEFAULT_RETRIES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,11 +19,15 @@ class DomainDataCoordinator(DataUpdateCoordinator):
         self.hass = hass
         self.entry = entry
 
+        self.interval = entry.options.get("interval", entry.data.get("interval", DEFAULT_SCAN_INTERVAL))
+        self.timeout = entry.options.get("timeout", entry.data.get("timeout", TIMEOUT))
+        self.retries = entry.options.get("retries", entry.data.get("retries", DEFAULT_RETRIES))
+
         super().__init__(
             hass,
             logger=_LOGGER,
             name="domain_monitor",
-            update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
+            update_interval=timedelta(seconds=self.interval),
         )
 
         raw = entry.options.get("services", entry.data.get("services", ""))
@@ -84,73 +88,88 @@ class DomainDataCoordinator(DataUpdateCoordinator):
         return results
 
     async def check_http(self, session, host, proto, keyword=None):
-        timestamp = int(datetime.now(UTC).timestamp())
-        url = f"{proto}://{host}?t={timestamp}"
-        start = datetime.now(UTC)
+        for attempt in range(self.retries):
+            timestamp = int(datetime.now(UTC).timestamp())
+            url = f"{proto}://{host}?t={timestamp}"
+            start = datetime.now(UTC)
 
-        headers = {
-            "User-Agent": "HomeAssistant-DomainMonitor/1.0",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache"
-        }
+            headers = {
+                "User-Agent": "HomeAssistant-DomainMonitor/1.0",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache"
+            }
 
-        try:
-            async with session.get(url, timeout=TIMEOUT, headers=headers) as resp:
-                status = "down"
-                
-                if resp.status < 400:
-                    status = "up"
+            try:
+                async with session.get(url, timeout=self.timeout, headers=headers) as resp:
+                    status = "down"
                     
-                    if keyword:
-                        content = await resp.text()
-                        try:
-                            if not re.search(keyword, content, re.IGNORECASE | re.DOTALL):
+                    if resp.status < 400:
+                        status = "up"
+                        
+                        if keyword:
+                            content = await resp.text()
+                            try:
+                                if not re.search(keyword, content, re.IGNORECASE | re.DOTALL):
+                                    status = "down"
+                                    _LOGGER.debug("Regex '%s' not found in response from %s", keyword, host)
+                            except re.error as e:
+                                _LOGGER.error("Invalid Regex '%s' for host %s: %s", keyword, host, e)
                                 status = "down"
-                                _LOGGER.debug("Regex '%s' not found in response from %s", keyword, host)
-                        except re.error as e:
-                            _LOGGER.error("Invalid Regex '%s' for host %s: %s", keyword, host, e)
-                            status = "down"
+
+                    result = {
+                        "host": host,
+                        "status": status,
+                        "code": resp.status,
+                        "response_ms": (datetime.now(UTC) - start).total_seconds() * 1000,
+                        "time": start
+                    }
+                    if status == "up":
+                        return result
+
+            except Exception as e:
+                _LOGGER.debug("Error checking %s (attempt %d/%d): %s", host, attempt + 1, self.retries, e)
+                result = {
+                    "host": host,
+                    "status": "down",
+                    "code": None,
+                    "response_ms": None,
+                    "time": start
+                }
+                
+            if attempt < self.retries - 1:
+                await asyncio.sleep(1)
+
+        return result
+
+    async def check_tcp(self, host, port):
+        for attempt in range(self.retries):
+            start = datetime.now(UTC)
+
+            try:
+                await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: socket.create_connection((host, port), timeout=self.timeout)
+                )
 
                 return {
                     "host": host,
-                    "status": status,
-                    "code": resp.status,
+                    "status": "up",
+                    "code": port,
                     "response_ms": (datetime.now(UTC) - start).total_seconds() * 1000,
                     "time": start
                 }
 
-        except Exception as e:
-            _LOGGER.debug("Error checking %s: %s", host, e)
-            return {
-                "host": host,
-                "status": "down",
-                "code": None,
-                "response_ms": None,
-                "time": start
-            }
+            except Exception as e:
+                _LOGGER.debug("Error checking TCP %s:%s (attempt %d/%d): %s", host, port, attempt + 1, self.retries, e)
+                result = {
+                    "host": host,
+                    "status": "down",
+                    "code": port,
+                    "response_ms": None,
+                    "time": start
+                }
+                
+            if attempt < self.retries - 1:
+                await asyncio.sleep(1)
 
-    async def check_tcp(self, host, port):
-        start = datetime.now(UTC)
-
-        try:
-            await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: socket.create_connection((host, port), timeout=TIMEOUT)
-            )
-
-            return {
-                "host": host,
-                "status": "up",
-                "code": port,
-                "response_ms": (datetime.now(UTC) - start).total_seconds() * 1000,
-                "time": start
-            }
-
-        except Exception:
-            return {
-                "host": host,
-                "status": "down",
-                "code": port,
-                "response_ms": None,
-                "time": start
-            }
+        return result

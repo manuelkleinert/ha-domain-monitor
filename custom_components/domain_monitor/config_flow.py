@@ -1,7 +1,7 @@
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
-from .const import DOMAIN
+from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, TIMEOUT, DEFAULT_RETRIES
 
 
 class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -18,6 +18,9 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required("type", default="https"): vol.In(["https", "http", "tcp"]),
             vol.Optional("port", default=443): int,
             vol.Optional("keyword"): str,
+            vol.Optional("interval", default=DEFAULT_SCAN_INTERVAL): int,
+            vol.Optional("timeout", default=TIMEOUT): int,
+            vol.Optional("retries", default=DEFAULT_RETRIES): int,
         })
 
         if user_input is not None:
@@ -25,6 +28,9 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             check_type = user_input["type"]
             port = user_input.get("port", 443)
             keyword = user_input.get("keyword", "").strip()
+            interval = user_input.get("interval", DEFAULT_SCAN_INTERVAL)
+            timeout = user_input.get("timeout", TIMEOUT)
+            retries = user_input.get("retries", DEFAULT_RETRIES)
 
             if check_type in ["http", "https"]:
                 if keyword:
@@ -39,7 +45,12 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             return self.async_create_entry(
                 title=display_title,
-                data={"services": service}
+                data={
+                    "services": service,
+                    "interval": interval,
+                    "timeout": timeout,
+                    "retries": retries
+                }
             )
 
         return self.async_show_form(step_id="user", data_schema=schema)
@@ -80,9 +91,15 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
         current_services = self._entry.options.get(
             "services", self._entry.data.get("services", "")
         )
+        current_interval = self._entry.options.get("interval", self._entry.data.get("interval", DEFAULT_SCAN_INTERVAL))
+        current_timeout = self._entry.options.get("timeout", self._entry.data.get("timeout", TIMEOUT))
+        current_retries = self._entry.options.get("retries", self._entry.data.get("retries", DEFAULT_RETRIES))
 
         schema = vol.Schema({
-            vol.Required("services", default=current_services): str
+            vol.Required("services", default=current_services): str,
+            vol.Optional("interval", default=current_interval): int,
+            vol.Optional("timeout", default=current_timeout): int,
+            vol.Optional("retries", default=current_retries): int,
         })
 
         return self.async_show_form(step_id="init", data_schema=schema)
