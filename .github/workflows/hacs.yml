@@ -15,5 +15,8 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
+          repository: ${{ github.repository }}
+          comment: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Hassfest Validation
         uses: home-assistant/actions/hassfest@master
