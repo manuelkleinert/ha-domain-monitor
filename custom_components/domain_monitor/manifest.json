@@ -1,15 +1,13 @@
 {
   "domain": "domain_monitor",
   "name": "Domain Monitor",
-  "version": "1.0.0",
-  "documentation": "https://github.com/manuelkleinert/ha-domain-monitor.git",
-  "issue_tracker": "https://github.com/manuelkleinert/ha-domain-monitor/issues",
-  "requirements": [
-    "aiohttp"
-  ],
-  "dependencies": [],
   "codeowners": ["@manuelkleinert"],
   "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/manuelkleinert/ha-domain-monitor.git",
+  "iot_class": "cloud_polling",
   "integration_type": "hub",
-  "iot_class": "cloud_polling"
+  "issue_tracker": "https://github.com/manuelkleinert/ha-domain-monitor/issues",
+  "requirements": ["aiohttp"],
+  "version": "1.0.0"
 }
