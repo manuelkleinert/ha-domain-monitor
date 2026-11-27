@@ -91,7 +91,7 @@ def test_resolve_port():
     assert _resolve_port("tcp", 8080) == 8080
 
 
-async def test_options_flow_shows_init_form(hass):
+async def test_options_flow_menu_then_settings(hass):
     await setup.async_setup_component(hass, "http", {})
 
     entry = MockConfigEntry(
@@ -106,14 +106,17 @@ async def test_options_flow_shows_init_form(hass):
     entry.add_to_hass(hass)
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
-    assert result["type"] == "form"
-    assert result["step_id"] == "init"
+    assert result["type"] == "menu"
+    assert set(result["menu_options"]) == {"settings", "manage"}
 
-    # Quick save (no service editing) must keep the entry usable and store tuning
+    # Navigate to the settings form and quick-save the tuning
+    result = await hass.config_entries.options.async_configure(result["flow_id"], "settings")
+    assert result["type"] == "form"
+    assert result["step_id"] == "settings"
+
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            "edit_services": False,
             "interval": 300,
             "timeout": 10,
             "retries": 3,
@@ -124,3 +127,4 @@ async def test_options_flow_shows_init_form(hass):
 
     assert result["type"] == "create_entry"
     assert result["data"]["interval"] == 300
+    assert len(result["data"]["services"]) == 1

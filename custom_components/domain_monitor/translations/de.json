@@ -20,9 +20,15 @@
   "options": {
     "step": {
       "init": {
+        "title": "Domain Monitor",
+        "menu_options": {
+          "settings": "Einstellungen",
+          "manage": "Dienste verwalten"
+        }
+      },
+      "settings": {
         "title": "Einstellungen",
         "data": {
-          "edit_services": "Dienste bearbeiten",
           "interval": "Prüfintervall (Sekunden)",
           "timeout": "Zeitüberschreitung (Sekunden)",
           "retries": "Wiederholungen",

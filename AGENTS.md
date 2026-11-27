@@ -147,11 +147,14 @@ dicts** (since ConfigFlow.VERSION 2; old string entries are migrated by
 - `button.py` — one "Check <service> Now" button per service
   (`CoordinatorEntity`), triggers `async_request_refresh`.
 - `config_flow.py` — user flow creates an entry with one service. The
-  options flow is a menu-driven editor: `init` (tuning + "edit services"
-  checkbox) → `manage` = BUTTON MENU (`async_show_menu`: add/edit/delete/done,
-  labels translated via `menu_options` in strings) with the CURRENT service
-  list rendered as Markdown in the description (`{services_list}` placeholder)
-  → `edit_service`/`delete_service` (dropdown) or `add_service` → `service`
+  options flow OPENS WITH A MENU (`async_show_menu`: "Settings" / "Manage
+  services"; labels translated via `menu_options` in strings — HA flow forms
+  cannot mix form fields and action buttons, so a checkbox was replaced by
+  this menu, do not reintroduce a checkbox): "Settings" → `settings` form
+  (tuning, saves immediately), "Manage services" → `manage` = BUTTON MENU
+  (add/edit/delete/done) with the CURRENT service list rendered as Markdown
+  in the description (`{services_list}` placeholder) →
+  `edit_service`/`delete_service` (dropdown) or `add_service` → `service`
   form → back to `manage`. Changes go to a WORKING COPY (`self._services`);
   nothing is saved until `done` (one single entry reload at the end). Shared
   schemas `_tuning_schema()` / `_service_fields_schema()` with validation:

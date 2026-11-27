@@ -130,17 +130,26 @@ async def run():
     handler.hass = hass
     handler.config_entry = entry  # the real framework sets this on the handler
 
-    # 1) init form
+    # 1) init is a menu with two paths
     result = await handler.async_step_init()
-    check("init: shows form", result["type"] == "form" and result["step_id"] == "init")
+    check("init: shows menu", result["type"] == "menu" and result["step_id"] == "init")
+    check("init: has settings+manage buttons", set(result["menu_options"]) == {"settings", "manage"})
 
-    # 2) submit with edit_services -> menu
-    result = await handler.async_step_init({"edit_services": True, **TUNING})
+    # 2) settings path: tuning form, saves immediately (services untouched)
+    result = await handler.async_step_settings()
+    check("settings: shows form", result["type"] == "form" and result["step_id"] == "settings")
+    result = await handler.async_step_settings(TUNING)
+    check("settings: create_entry", result["type"] == "create_entry")
+    check("settings: tuning saved", result["data"]["interval"] == 60)
+    check("settings: services kept", len(result["data"]["services"]) == 2)
+
+    # 3) manage path: menu with the service list
+    result = await handler.async_step_manage()
     check("manage: shows menu", result["type"] == "menu" and result["step_id"] == "manage")
     check("manage: has 4 buttons", set(result["menu_options"]) == {"add_service", "edit_service", "delete_service", "done"})
     check("manage: list in description", "a.com (https:443)" in result["description_placeholders"]["services_list"])
 
-    # 3) add a new service
+    # 4) add a new service
     result = await handler.async_step_add_service()
     check("add: shows service form", result["type"] == "form" and result["step_id"] == "service")
     result = await handler.async_step_service(
@@ -149,14 +158,14 @@ async def run():
     check("add: back to menu", result["type"] == "menu")
     check("add: list now 3 entries", "c.com (https:443)" in handler._services_list_markdown())
 
-    # 4) duplicate is rejected
+    # 5) duplicate is rejected
     result = await handler.async_step_add_service()
     result = await handler.async_step_service(
         {"host": "c.com", "type": "https", "port": 443, "keyword": ""}
     )
     check("duplicate: rejected", result["errors"].get("base") == "duplicate_service")
 
-    # 5) edit existing service (change port)
+    # 6) edit existing service (change port)
     result = await handler.async_step_edit_service()
     check("edit: shows select", result["type"] == "form" and result["step_id"] == "edit_service")
     result = await handler.async_step_edit_service({"service": "b.com:http:80"})
@@ -167,14 +176,14 @@ async def run():
     check("edit: back to menu", result["type"] == "menu")
     check("edit: port changed", "b.com (http:8080)" in handler._services_list_markdown())
 
-    # 6) delete a service
+    # 7) delete a service
     result = await handler.async_step_delete_service()
     check("delete: shows select", result["type"] == "form" and result["step_id"] == "delete_service")
     result = await handler.async_step_delete_service({"service": "b.com:http:8080"})
     check("delete: back to menu", result["type"] == "menu")
     check("delete: entry removed", "b.com" not in handler._services_list_markdown())
 
-    # 7) deleting the last remaining service is blocked
+    # 8) deleting the last remaining service is blocked
     result = await handler.async_step_delete_service()
     result = await handler.async_step_delete_service({"service": "a.com:https:443"})
     check("delete second-to-last: allowed", result["type"] == "menu")
@@ -182,19 +191,11 @@ async def run():
     result = await handler.async_step_delete_service({"service": "c.com:https:443"})
     check("delete last: blocked", result["errors"].get("base") == "at_least_one")
 
-    # 8) done -> saves working list + tuning, updates entry title
+    # 9) done -> saves working list, keeps the tuning from the entry
     result = await handler.async_step_done()
     check("done: create_entry", result["type"] == "create_entry")
     check("done: services saved", len(result["data"]["services"]) == 1)
-    check("done: tuning saved", result["data"]["interval"] == 60)
     check("done: entry title updated", hass.updated[-1][1].get("title") == "c.com (https:443)")
-
-    # 9) init without edit -> saves tuning only
-    handler2 = DomainMonitorOptionsFlowHandler()
-    handler2.hass = hass
-    handler2.config_entry = entry
-    result = await handler2.async_step_init({"edit_services": False, **TUNING})
-    check("init: quick save", result["type"] == "create_entry" and result["data"]["timeout"] == 10)
 
 
 asyncio.run(run())

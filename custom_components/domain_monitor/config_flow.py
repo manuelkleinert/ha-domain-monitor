@@ -100,16 +100,17 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
-    """Options flow: tuning plus a menu-driven editor for the service list.
+    """Options flow: a menu with two paths – tuning and the service editor.
 
-    The manage step renders as BUTTONS (async_show_menu) with the current
-    services listed in the description; changes are applied to a working
-    copy and saved once when the user is done.
+    HA flow forms cannot mix form fields and action buttons, so instead of a
+    checkbox the flow opens with a menu: "Settings" shows the tuning form,
+    "Services" opens the menu-driven editor (add/edit/delete/done) with the
+    current services listed in its description.
     """
 
     def __init__(self):
         self._tuning: dict = {}
-        self._services: list[dict] = []
+        self._services: list[dict] | None = None
         self._editing_sid: str | None = None
 
     def _entry_services(self) -> list[dict]:
@@ -117,33 +118,10 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
         services, _ = normalize_services(raw)
         return services
 
-    def _services_list_markdown(self) -> str:
-        if not self._services:
-            return "-"
-        return "\n".join(f"- {_service_label(s)}" for s in self._services)
-
-    def _service_options(self) -> dict:
-        return {service_id(s): _service_label(s) for s in self._services}
-
-    async def async_step_init(self, user_input=None):
-        if user_input is not None:
-            self._tuning = {
-                "interval": user_input["interval"],
-                "timeout": user_input["timeout"],
-                "retries": user_input["retries"],
-                "slow_threshold_ms": user_input["slow_threshold_ms"],
-            }
-
-            if user_input["edit_services"]:
-                self._services = self._entry_services()
-                return await self.async_step_manage()
-
-            return await self._async_save(self._entry_services())
-
-        current = self.config_entry.options
-        fallback = self.config_entry.data
-        defaults = self._tuning or {
-            key: current.get(key, fallback.get(key, default))
+    def _current_tuning(self) -> dict:
+        entry = self.config_entry
+        return {
+            key: entry.options.get(key, entry.data.get(key, default))
             for key, default in (
                 ("interval", DEFAULT_SCAN_INTERVAL),
                 ("timeout", TIMEOUT),
@@ -152,16 +130,40 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
             )
         }
 
-        schema = vol.Schema(
-            {
-                vol.Required("edit_services", default=False): bool,
-                **_tuning_schema(defaults),
-            }
+    def _services_list_markdown(self) -> str:
+        if not self._services:
+            return "-"
+        return "\n".join(f"- {_service_label(s)}" for s in self._services)
+
+    def _service_options(self) -> dict:
+        return {service_id(s): _service_label(s) for s in self._services or []}
+
+    async def async_step_init(self, user_input=None):
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["settings", "manage"],
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+
+    async def async_step_settings(self, user_input=None):
+        if user_input is not None:
+            self._tuning = {
+                "interval": user_input["interval"],
+                "timeout": user_input["timeout"],
+                "retries": user_input["retries"],
+                "slow_threshold_ms": user_input["slow_threshold_ms"],
+            }
+            return await self._async_save(self._entry_services())
+
+        return self.async_show_form(
+            step_id="settings",
+            data_schema=vol.Schema(_tuning_schema(self._tuning or self._current_tuning())),
+        )
 
     async def async_step_manage(self, user_input=None):
         """Overview: current services in the description, actions as buttons."""
+        if self._services is None:
+            self._services = self._entry_services()
+
         return self.async_show_menu(
             step_id="manage",
             menu_options=["add_service", "edit_service", "delete_service", "done"],
@@ -212,11 +214,11 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_done(self, user_input=None):
         """Leave the editor and save all changes at once."""
-        return await self._async_save(self._services)
+        return await self._async_save(self._services or [])
 
     async def async_step_service(self, user_input=None):
         current = next(
-            (s for s in self._services if service_id(s) == self._editing_sid), None
+            (s for s in self._services or [] if service_id(s) == self._editing_sid), None
         )
 
         if user_input is None:
@@ -240,7 +242,7 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
         }
         sid = service_id(service)
 
-        if any(service_id(s) == sid for s in self._services) and sid != self._editing_sid:
+        if any(service_id(s) == sid for s in self._services or []) and sid != self._editing_sid:
             return self.async_show_form(
                 step_id="service",
                 data_schema=vol.Schema(
@@ -266,13 +268,14 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
         return await self.async_step_manage()
 
     async def _async_save(self, services: list[dict]):
-        title = _service_label(services[0]) if services else self.config_entry.title
-        self.hass.config_entries.async_update_entry(self.config_entry, title=title)
+        entry = self.config_entry
+        title = _service_label(services[0]) if services else entry.title
+        self.hass.config_entries.async_update_entry(entry, title=title)
 
         return self.async_create_entry(
             title="",
             data={
                 "services": services,
-                **self._tuning,
+                **(self._tuning or self._current_tuning()),
             },
         )
