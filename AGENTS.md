@@ -14,7 +14,7 @@ sensors. One config entry can monitor MULTIPLE services (v2); the global
 binary sensor aggregates ALL entries.
 
 - Language: Python, Home Assistant custom component, config via UI (config flow).
-- `manifest.json` holds the version (e.g. `2.0.1`) — bump it for every release.
+- `manifest.json` holds the version (e.g. `2.0.2`) — bump it for every release.
   It also carries `categories: ["computers_network", "sensors"]` — required
   by hassfest/HACS validation (1–3 known HA integration categories; unknown
   ones only warn for custom integrations).
