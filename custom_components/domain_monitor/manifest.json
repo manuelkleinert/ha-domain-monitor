@@ -1,6 +1,7 @@
 {
   "domain": "domain_monitor",
   "name": "Domain Monitor",
+  "categories": ["computers_network", "sensors"],
   "codeowners": ["@manuelkleinert"],
   "config_flow": true,
   "dependencies": ["diagnostics"],
