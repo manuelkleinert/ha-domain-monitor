@@ -8,6 +8,5 @@
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/manuelkleinert/ha-domain-monitor/issues",
-  "requirements": ["aiohttp"],
-  "version": "1.0.0"
+  "version": "1.1.0"
 }

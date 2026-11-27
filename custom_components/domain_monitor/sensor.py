@@ -1,8 +1,10 @@
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .const import DOMAIN
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    coordinator = hass.data["domain_monitor"][entry.entry_id]
+    coordinator = hass.data[DOMAIN][entry.entry_id]
 
     entities = []
 
@@ -12,12 +14,13 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(entities)
 
 
-class DomainSensor(Entity):
+class DomainSensor(CoordinatorEntity):
+    """Sensor that updates automatically whenever the coordinator refreshes."""
 
     def __init__(self, coordinator, service):
-        self.coordinator = coordinator
+        super().__init__(coordinator)
         self.service = service
-        
+
         host = service["host"]
         if service["type"] == "https":
             name = f"{host} (https)"
@@ -32,7 +35,7 @@ class DomainSensor(Entity):
             name = f"{host} (tcp:{port})"
             uid = f"domain_monitor_{host}_tcp_{port}"
             icon = "mdi:lan"
-            
+
         self._attr_name = name
         self._attr_unique_id = uid.replace(".", "_")
         self._attr_icon = icon

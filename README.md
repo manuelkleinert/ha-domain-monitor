@@ -23,6 +23,19 @@ During setup, you can configure:
 - **Uptime Percentage**: Tracks the percentage of successful checks (rolling window of the last 100 checks).
 - **Dynamic Configuration**: Adjust the scan interval, timeout, and retry count directly from the device dashboard using Number entities, without restarting Home Assistant.
 - **Reconfigure via UI**: Update the host, type, port, or keyword seamlessly through the integration options.
+- **Internet outage aware**: If Home Assistant itself has no internet connection, monitored services are reported as `unknown` (attribute `no_internet: true`) instead of `down`, so your automations do not raise false alarms.
+
+## Internet outage behavior
+Before a failed check marks a server as `down`, the integration verifies Home
+Assistant's own connectivity with lightweight canary checks (HTTP 204 endpoints
+such as `clients3.google.com/generate_204` and a TCP check against `1.1.1.1:443`).
+If none of them succeeds, the monitored server is not the problem:
+
+- Per-service sensors show the state `unknown` with the attribute `no_internet: true`.
+- The **Overall Domain Status** sensor stays `on` and exposes the attributes
+  `internet_connected: false` and `unknown_hosts`.
+- While the outage lasts, only the cheap canary checks run until the internet
+  is back; monitored servers are checked again automatically afterwards.
 
 ## Automation
 You can easily trigger automations based on the state change of the monitored domain (e.g., when the binary sensor state changes to `off` / `down`).
