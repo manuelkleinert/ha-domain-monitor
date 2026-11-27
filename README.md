@@ -18,14 +18,14 @@ During setup, you can configure:
 - **Retries**: Number of retries before marking the service as down.
 - **Slow threshold**: Optional. If a healthy response takes longer than this many milliseconds, the result is flagged as `slow` (0 = disabled).
 
-One config entry can monitor **multiple services** — add, edit, or remove them via the entry's options (gear icon). All entities of an entry are grouped under a single device.
+One config entry can monitor **multiple services** — manage them via the entry's options (gear icon): the options dialog opens with a menu (**Settings** for interval/timeout/retries/slow threshold, **Manage services** to add, edit, or delete services from a list with buttons). All entities of an entry are grouped under a single device.
 
 ## Entities per service
 - **Status sensor** (`up`/`down`/`unknown`) with `uptime_percent` attribute
-- **Response Time sensor** (ms, graphable, long-term statistics)
+- **Response Time sensor** (ms, `duration` device class — graphable, long-term statistics)
 - **Connected binary sensor** (`CONNECTIVITY`) for direct on/off automations
 - **Certificate sensor** (HTTPS only): days until the TLS certificate expires, with `expires_at`, `issuer` and `subject` attributes
-- **Monitor switch**: pause/resume checking of an individual service (runtime only — switches reset to on after an HA restart)
+- **Monitor switch**: pause/resume checking of an individual service (the paused state survives HA restarts)
 - **Check Now button**: trigger an immediate refresh
 
 Plus per entry: Interval / Timeout / Retries / Slow threshold number entities, and one global **Overall Domain Status** binary sensor spanning ALL entries.
@@ -61,13 +61,13 @@ automation:
   - alias: "Warn before certificate expires"
     trigger:
       - platform: numeric_state
-        entity_id: sensor.example_com_https_certificate
+        entity_id: sensor.example_com_https_443_certificate  # replace with your entity id
         below: 14
     action:
       - service: notify.persistent_notification
         data:
           title: "Certificate of example.com expires soon"
-          message: "Only {{ states('sensor.example_com_https_certificate') }} days left!"
+          message: "Only {{ states('sensor.example_com_https_443_certificate') }} days left!"
 ```
 
 ## Internet outage behavior
@@ -78,4 +78,4 @@ automation:
 "Download diagnostics" on the device page returns the configuration (keyword regexes redacted), current results and certificate info — handy for issue reports.
 
 ## Migration from 1.x
-Version 2.0.0 migrates existing entries automatically (service strings become structured JSON). Because of the new stable entity IDs, previously customized entities are re-created once — re-apply any dashboard customizations after updating.
+Version 2.0 migrates existing entries automatically (service strings become structured JSON). Because of the new stable entity IDs, previously customized entities are re-created once — re-apply any dashboard customizations after updating.
