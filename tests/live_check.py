@@ -72,7 +72,6 @@ helpers.update_coordinator = update_coordinator
 helpers.issue_registry = issue_registry
 helpers.aiohttp_client = aiohttp_client
 
-from custom_components.domain_monitor.const import DOMAIN  # noqa: E402
 from custom_components.domain_monitor.coordinator import DomainDataCoordinator  # noqa: E402
 
 SERVICES = [
