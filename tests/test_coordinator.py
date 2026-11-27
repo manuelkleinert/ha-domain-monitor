@@ -165,10 +165,10 @@ async def test_status_change_fires_event(hass):
         patch.object(coordinator, "check_http", AsyncMock(return_value=up.copy())),
         patch.object(coordinator, "_async_refresh_certificates", AsyncMock()),
     ):
-        await coordinator._async_update_data()
+        coordinator.data = await coordinator._async_update_data()
 
         with patch.object(coordinator, "check_http", AsyncMock(return_value=down.copy())):
-            await coordinator._async_update_data()
+            coordinator.data = await coordinator._async_update_data()
 
     await hass.async_block_till_done()
 

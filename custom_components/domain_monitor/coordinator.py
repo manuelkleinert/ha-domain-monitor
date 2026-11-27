@@ -253,6 +253,8 @@ class DomainDataCoordinator(DataUpdateCoordinator):
 
         if sid in self.disabled:
             current = (self.data or {}).get(sid)
+            if self.data is None:
+                self.data = {}
             self.data[sid] = {
                 **(current or {}),
                 "status": "unknown",
