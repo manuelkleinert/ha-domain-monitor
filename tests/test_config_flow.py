@@ -1,4 +1,6 @@
+import pytest
 from homeassistant import config_entries, setup
+from homeassistant.data_entry_flow import InvalidData
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.domain_monitor.const import DOMAIN
@@ -45,21 +47,22 @@ async def test_user_flow_rejects_bad_host(hass):
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        {
-            "host": "https://evil.com/path",
-            "type": "https",
-            "port": 443,
-            "keyword": "",
-            "interval": 60,
-            "timeout": 10,
-            "retries": 3,
-            "slow_threshold_ms": 2000,
-        },
-    )
-    assert result["type"] == "form"
-    assert result["errors"]
+    # Schema violations are rejected by the flow manager itself (InvalidData)
+    with pytest.raises(InvalidData) as exc:
+        await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                "host": "https://evil.com/path",
+                "type": "https",
+                "port": 443,
+                "keyword": "",
+                "interval": 60,
+                "timeout": 10,
+                "retries": 3,
+                "slow_threshold_ms": 2000,
+            },
+        )
+    assert "host" in str(exc.value)
 
 
 async def test_user_flow_rejects_out_of_range(hass):
@@ -68,21 +71,21 @@ async def test_user_flow_rejects_out_of_range(hass):
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        {
-            "host": "example.com",
-            "type": "https",
-            "port": 443,
-            "keyword": "",
-            "interval": 5,
-            "timeout": 10,
-            "retries": 0,
-            "slow_threshold_ms": 2000,
-        },
-    )
-    assert result["type"] == "form"
-    assert result["errors"]
+    with pytest.raises(InvalidData) as exc:
+        await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                "host": "example.com",
+                "type": "https",
+                "port": 443,
+                "keyword": "",
+                "interval": 5,
+                "timeout": 10,
+                "retries": 0,
+                "slow_threshold_ms": 2000,
+            },
+        )
+    assert "interval" in str(exc.value) or "retries" in str(exc.value)
 
 
 def test_resolve_port():

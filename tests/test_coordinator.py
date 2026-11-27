@@ -1,7 +1,9 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from custom_components.domain_monitor.const import EVENT_STATUS_CHANGED
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.domain_monitor.const import DOMAIN, EVENT_STATUS_CHANGED
 from custom_components.domain_monitor.coordinator import (
     DomainDataCoordinator,
     normalize_services,
@@ -11,16 +13,12 @@ from custom_components.domain_monitor.coordinator import (
 
 
 def _coordinator(hass, services, options=None) -> DomainDataCoordinator:
-    entry = type(
-        "Entry",
-        (),
-        {
-            "entry_id": "test_entry",
-            "data": {"services": services},
-            "options": options or {},
-            "title": "Test",
-        },
-    )()
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"services": services},
+        options=options or {},
+        title="Test",
+    )
     return DomainDataCoordinator(hass, entry)
 
 
@@ -55,8 +53,9 @@ def test_parse_invalid_entries_collected():
 def test_default_ports_applied():
     services, _ = normalize_services([{"host": "example.com", "type": "https", "port": None}])
     assert services[0]["port"] == 443
-    services, _ = normalize_services("example.com:http:443")
-    assert services[0]["port"] == 443
+    services, _ = normalize_services("example.com:http:80:")
+    assert services[0]["port"] == 80
+    assert services[0]["keyword"] is None
     services, _ = normalize_services("example.com:https:Welcome")
     assert services[0]["port"] == 443
     assert services[0]["keyword"] == "Welcome"
