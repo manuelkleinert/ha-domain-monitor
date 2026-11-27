@@ -18,10 +18,13 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 
 class DomainMonitorButton(CoordinatorEntity, ButtonEntity):
+    _attr_has_entity_name = True
+
     def __init__(self, coordinator, service: dict):
         super().__init__(coordinator)
         self.service = service
-        self._attr_name = f"Check {_service_label(service)} Now"
+        self._attr_translation_key = "check_button"
+        self._attr_translation_placeholders = {"host": _service_label(service)}
         self._attr_unique_id = f"{_unique_id_base(coordinator, service)}_check_button"
         self._attr_device_info = build_device_info(coordinator.entry)
         self._attr_icon = "mdi:refresh"

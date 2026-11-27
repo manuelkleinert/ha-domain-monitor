@@ -1,4 +1,4 @@
-from homeassistant.components.sensor import SensorStateClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -22,7 +22,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 def _service_label(service: dict) -> str:
     if service["type"] == "tcp":
         return f"{service['host']} (tcp:{service['port']})"
-    return f"{service['host']} ({service['type']})"
+    return f"{service['host']} ({service['type']}:{service['port']})"
 
 
 def _unique_id_base(coordinator, service: dict) -> str:
@@ -32,10 +32,13 @@ def _unique_id_base(coordinator, service: dict) -> str:
 class DomainSensor(CoordinatorEntity):
     """Availability sensor that updates on every coordinator refresh."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, coordinator, service: dict):
         super().__init__(coordinator)
         self.service = service
-        self._attr_name = _service_label(service)
+        self._attr_translation_key = "status"
+        self._attr_translation_placeholders = {"host": _service_label(service)}
         self._attr_unique_id = f"{_unique_id_base(coordinator, service)}_status"
         self._attr_device_info = build_device_info(coordinator.entry)
         self._attr_icon = {
@@ -63,13 +66,17 @@ class DomainSensor(CoordinatorEntity):
 class DomainResponseTimeSensor(CoordinatorEntity):
     """Response time of the last check in milliseconds (graphable)."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, coordinator, service: dict):
         super().__init__(coordinator)
         self.service = service
-        self._attr_name = f"{_service_label(service)} Response Time"
+        self._attr_translation_key = "response_time"
+        self._attr_translation_placeholders = {"host": _service_label(service)}
         self._attr_unique_id = f"{_unique_id_base(coordinator, service)}_response_time"
         self._attr_device_info = build_device_info(coordinator.entry)
         self._attr_icon = "mdi:speedometer"
+        self._attr_device_class = SensorDeviceClass.DURATION
         self._attr_native_unit_of_measurement = "ms"
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
@@ -84,10 +91,13 @@ class DomainResponseTimeSensor(CoordinatorEntity):
 class DomainCertificateSensor(CoordinatorEntity):
     """Days until the TLS certificate of an HTTPS service expires."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, coordinator, service: dict):
         super().__init__(coordinator)
         self.service = service
-        self._attr_name = f"{_service_label(service)} Certificate"
+        self._attr_translation_key = "certificate"
+        self._attr_translation_placeholders = {"host": _service_label(service)}
         self._attr_unique_id = f"{_unique_id_base(coordinator, service)}_certificate"
         self._attr_device_info = build_device_info(coordinator.entry)
         self._attr_icon = "mdi:certificate"
@@ -97,7 +107,7 @@ class DomainCertificateSensor(CoordinatorEntity):
     @property
     def native_value(self):
         info = self.coordinator.cert_info(self.service["id"])
-        if not info:
+        if not info or "days_left" not in info:
             return None
         return info["days_left"]
 

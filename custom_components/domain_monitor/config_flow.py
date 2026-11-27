@@ -24,9 +24,6 @@ from .const import (
 # it collides with the colon-based legacy string format.
 HOST_PATTERN = r"^([A-Za-z0-9._-]+|\[[0-9a-fA-F:]+\])$"
 
-_ADD_SERVICE = "__add__"
-_DONE = "__done__"
-
 
 def _tuning_schema(tuning: dict) -> dict:
     return {
@@ -74,7 +71,7 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
-        return DomainMonitorOptionsFlowHandler(config_entry)
+        return DomainMonitorOptionsFlowHandler()
 
     async def async_step_user(self, user_input=None):
         if user_input is not None:
@@ -103,16 +100,30 @@ class DomainMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
-    """Options flow: tuning plus a multi-step editor for the service list."""
+    """Options flow: tuning plus a menu-driven editor for the service list.
 
-    def __init__(self, config_entry):
-        self._entry = config_entry
+    The manage step renders as BUTTONS (async_show_menu) with the current
+    services listed in the description; changes are applied to a working
+    copy and saved once when the user is done.
+    """
+
+    def __init__(self):
         self._tuning: dict = {}
+        self._services: list[dict] = []
+        self._editing_sid: str | None = None
 
-    def _current_services(self) -> list[dict]:
-        raw = self._entry.options.get("services", self._entry.data.get("services", []))
+    def _entry_services(self) -> list[dict]:
+        raw = self.config_entry.options.get("services", self.config_entry.data.get("services", []))
         services, _ = normalize_services(raw)
         return services
+
+    def _services_list_markdown(self) -> str:
+        if not self._services:
+            return "-"
+        return "\n".join(f"- {_service_label(s)}" for s in self._services)
+
+    def _service_options(self) -> dict:
+        return {service_id(s): _service_label(s) for s in self._services}
 
     async def async_step_init(self, user_input=None):
         if user_input is not None:
@@ -124,12 +135,13 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
             }
 
             if user_input["edit_services"]:
+                self._services = self._entry_services()
                 return await self.async_step_manage()
 
-            return await self._async_save(self._current_services())
+            return await self._async_save(self._entry_services())
 
-        current = self._entry.options
-        fallback = self._entry.data
+        current = self.config_entry.options
+        fallback = self.config_entry.data
         defaults = self._tuning or {
             key: current.get(key, fallback.get(key, default))
             for key, default in (
@@ -149,46 +161,76 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_form(step_id="init", data_schema=schema)
 
     async def async_step_manage(self, user_input=None):
-        services = self._current_services()
+        """Overview: current services in the description, actions as buttons."""
+        return self.async_show_menu(
+            step_id="manage",
+            menu_options=["add_service", "edit_service", "delete_service", "done"],
+            description_placeholders={"services_list": self._services_list_markdown()},
+        )
 
+    async def async_step_add_service(self, user_input=None):
+        self._editing_sid = None
+        return await self.async_step_service()
+
+    async def async_step_edit_service(self, user_input=None):
         if user_input is not None:
-            selected = user_input["service"]
-            if selected == _DONE:
-                return await self.async_step_init()
-            if selected == _ADD_SERVICE:
-                return await self.async_step_service()
-            service = next(s for s in services if service_id(s) == selected)
-            return await self.async_step_service(service)
+            self._editing_sid = user_input["service"]
+            return await self.async_step_service()
 
-        mapping = {service_id(s): _service_label(s) for s in services}
-        mapping[_ADD_SERVICE] = "+ Add new service"
-        mapping[_DONE] = "- Done -"
+        if not self._services:
+            return await self.async_step_manage()
 
-        schema = vol.Schema({vol.Required("service"): vol.In(mapping)})
-        return self.async_show_form(step_id="manage", data_schema=schema)
+        return self.async_show_form(
+            step_id="edit_service",
+            data_schema=vol.Schema({vol.Required("service"): vol.In(self._service_options())}),
+        )
 
-    async def async_step_service(self, user_input=None):
-        services = self._current_services()
-        editing = getattr(self, "_editing_sid", None)
-
-        if user_input is None:
-            service = next((s for s in services if service_id(s) == editing), None)
-            self._editing_sid = service_id(service) if service else None
-            return self.async_show_form(
-                step_id="service", data_schema=self._service_form_schema(service)
-            )
-
-        current = next((s for s in services if service_id(s) == self._editing_sid), None)
-
-        if user_input["delete"]:
-            if len(services) <= 1:
+    async def async_step_delete_service(self, user_input=None):
+        if user_input is not None:
+            if len(self._services) <= 1:
                 return self.async_show_form(
-                    step_id="service",
-                    data_schema=self._service_form_schema(current),
+                    step_id="delete_service",
+                    data_schema=vol.Schema(
+                        {vol.Required("service"): vol.In(self._service_options())}
+                    ),
                     errors={"base": "at_least_one"},
                 )
-            services = [s for s in services if service_id(s) != self._editing_sid]
-            return await self._async_save(services)
+            self._services = [
+                s for s in self._services if service_id(s) != user_input["service"]
+            ]
+            return await self.async_step_manage()
+
+        if not self._services:
+            return await self.async_step_manage()
+
+        return self.async_show_form(
+            step_id="delete_service",
+            data_schema=vol.Schema(
+                {vol.Required("service"): vol.In(self._service_options())}
+            ),
+        )
+
+    async def async_step_done(self, user_input=None):
+        """Leave the editor and save all changes at once."""
+        return await self._async_save(self._services)
+
+    async def async_step_service(self, user_input=None):
+        current = next(
+            (s for s in self._services if service_id(s) == self._editing_sid), None
+        )
+
+        if user_input is None:
+            schema = (
+                _service_fields_schema(
+                    host=current["host"],
+                    check_type=current["type"],
+                    port=current["port"],
+                    keyword=current["keyword"] or "",
+                )
+                if current
+                else _service_fields_schema()
+            )
+            return self.async_show_form(step_id="service", data_schema=vol.Schema(schema))
 
         service = {
             "host": user_input["host"].strip(),
@@ -198,39 +240,34 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
         }
         sid = service_id(service)
 
-        if any(service_id(s) == sid for s in services) and sid != self._editing_sid:
+        if any(service_id(s) == sid for s in self._services) and sid != self._editing_sid:
             return self.async_show_form(
                 step_id="service",
-                data_schema=self._service_form_schema(current),
+                data_schema=vol.Schema(
+                    _service_fields_schema(
+                        host=current["host"],
+                        check_type=current["type"],
+                        port=current["port"],
+                        keyword=current["keyword"] or "",
+                    )
+                    if current
+                    else _service_fields_schema()
+                ),
                 errors={"base": "duplicate_service"},
             )
 
         if self._editing_sid:
-            services = [
-                service if service_id(s) == self._editing_sid else s for s in services
+            self._services = [
+                service if service_id(s) == self._editing_sid else s for s in self._services
             ]
         else:
-            services.append(service)
+            self._services.append(service)
 
-        return await self._async_save(services)
-
-    @staticmethod
-    def _service_form_schema(service: dict | None):
-        schema = (
-            _service_fields_schema(
-                host=service["host"],
-                check_type=service["type"],
-                port=service["port"],
-                keyword=service["keyword"] or "",
-            )
-            if service
-            else _service_fields_schema()
-        )
-        return vol.Schema({**schema, vol.Required("delete", default=False): bool})
+        return await self.async_step_manage()
 
     async def _async_save(self, services: list[dict]):
-        title = _service_label(services[0]) if services else self._entry.title
-        self.hass.config_entries.async_update_entry(self._entry, title=title)
+        title = _service_label(services[0]) if services else self.config_entry.title
+        self.hass.config_entries.async_update_entry(self.config_entry, title=title)
 
         return self.async_create_entry(
             title="",

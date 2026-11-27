@@ -279,6 +279,7 @@ class DomainDataCoordinator(DataUpdateCoordinator):
         await self._async_refresh_certificates()
 
         tasks = []
+        task_services = []
         for service in self.services:
             sid = service["id"]
 
@@ -286,8 +287,10 @@ class DomainDataCoordinator(DataUpdateCoordinator):
                 self._store(service, self._disabled_result(service), results)
             elif service["type"] in ("http", "https"):
                 tasks.append(self.check_http(session, service))
+                task_services.append(service)
             else:
                 tasks.append(self.check_tcp(service))
+                task_services.append(service)
 
         responses = await asyncio.gather(*tasks)
 
@@ -299,7 +302,7 @@ class DomainDataCoordinator(DataUpdateCoordinator):
                 item["status"] = "unknown"
                 item["no_internet"] = True
 
-        for service, item in zip(self.services, responses):
+        for service, item in zip(task_services, responses):
             self._store(service, item, results)
 
         return results
@@ -365,7 +368,15 @@ class DomainDataCoordinator(DataUpdateCoordinator):
             else:
                 tasks.append(self._canary_tcp(check["host"], check["port"]))
 
+        previous_ok = self._internet_ok
         self._internet_ok = any(await asyncio.gather(*tasks))
+        if previous_ok is not False and self._internet_ok is False:
+            _LOGGER.warning(
+                "No internet connectivity detected (all canary checks failed) – "
+                "monitored services are reported as unknown until it is back"
+            )
+        elif previous_ok is False and self._internet_ok:
+            _LOGGER.info("Internet connectivity is back – resuming regular checks")
         _LOGGER.debug("Internet connectivity check result: %s", self._internet_ok)
         return self._internet_ok
 
@@ -430,6 +441,10 @@ class DomainDataCoordinator(DataUpdateCoordinator):
             )
         except Exception as e:
             _LOGGER.debug("Certificate check failed for %s:%s: %s", host, service["port"], e)
+            self.cert_data[service["id"]] = {
+                "error": f"certificate check failed: {e}",
+                "checked_at": datetime.now(UTC).isoformat(),
+            }
             return
 
         try:
@@ -445,6 +460,10 @@ class DomainDataCoordinator(DataUpdateCoordinator):
         info = parse_peer_cert(cert or {})
         if info is None:
             _LOGGER.debug("No certificate information received from %s:%s", host, service["port"])
+            self.cert_data[service["id"]] = {
+                "error": "no certificate information received",
+                "checked_at": datetime.now(UTC).isoformat(),
+            }
             return
 
         self.cert_data[service["id"]] = info

@@ -14,7 +14,7 @@ sensors. One config entry can monitor MULTIPLE services (v2); the global
 binary sensor aggregates ALL entries.
 
 - Language: Python, Home Assistant custom component, config via UI (config flow).
-- `manifest.json` holds the version (e.g. `2.0.0`) — bump it for every release.
+- `manifest.json` holds the version (e.g. `2.0.1`) — bump it for every release.
 - `hacs.json` sets `homeassistant: 2024.6.0` as minimum HA version; Python 3.11+
   (the code uses `datetime.UTC`).
 - CI: `.github/workflows/validate.yml` (hassfest, HACS action, ruff) and
@@ -66,6 +66,10 @@ dicts** (since ConfigFlow.VERSION 2; old string entries are migrated by
     2. Refresh stale certificates for HTTPS services (`_async_refresh_certificates`).
     3. Disabled services (switch off) get `unknown`/`enabled: false` without
        running checks; all others run in parallel (`asyncio.gather`).
+       IMPORTANT: enabled services are collected in `task_services` alongside
+       their tasks so results are paired back correctly even when a disabled
+       service precedes an enabled one (a positional zip over self.services
+       shifted results under wrong ids once — do not reintroduce).
     4. If any check failed → run the canary ONCE. Internet down → all failed
        results become `status="unknown"` + `no_internet: true` instead of
        `down`. Internet up → results stay `down` (server is really down).
@@ -98,13 +102,22 @@ dicts** (since ConfigFlow.VERSION 2; old string entries are migrated by
     SNI) and reads `getpeercert()`; `parse_peer_cert()` is a pure function
     (unit tested) handling BOTH RDN shapes of the `issuer`/`subject` fields;
     result cached in `cert_data[sid]` for `CERT_EXPIRY_CACHE`. Probes are
-    skipped while offline. IP hosts as SNI usually fail → sensor stays
-    `unknown` there (documented limitation).
+    skipped while offline. On failure an error entry
+    (`{"error": ..., "checked_at": ...}`) is stored so the sensor can explain
+    its unknown state (e.g. self-signed certs / IP hosts — verification stays
+    ON by design).
 - `sensor.py` — per service: `DomainSensor` (status + `uptime_percent`
-  attribute), `DomainResponseTimeSensor` (ms, `measurement`), and for HTTPS
+  attribute), `DomainResponseTimeSensor` (ms, device class `DURATION`,
+  `measurement`), and for HTTPS
   `DomainCertificateSensor` (days left, unit `d`, `measurement`).
   All entities **must** extend `CoordinatorEntity` (plain `Entity` froze
   states — that bug existed once, do not reintroduce).
+- Entity naming/i18n: ALL entities use `_attr_has_entity_name = True` +
+  `_attr_translation_key` (+ `_attr_translation_placeholders = {"host": label}`)
+  — names come from the `entity.<platform>.<key>.name` sections in
+  `strings.json`/`translations/*.json`. Do NOT hardcode `_attr_name` again.
+- Icons: `mdi:tachometer` is REMOVED from current MDI (shows as missing icon in
+  HA) — use `mdi:gauge`. That bug existed once; prefer current MDI names.
 - `binary_sensor.py` — per service `DomainServiceBinarySensor`
   (CONNECTIVITY; `available` False while status unknown → no false alarms) and
   the global "Overall Domain Status" (unique_id `domain_monitor_overall_status`):
@@ -116,23 +129,36 @@ dicts** (since ConfigFlow.VERSION 2; old string entries are migrated by
     subscribes to every OTHER coordinator in `async_added_to_hass` so any
     refresh updates it. Coordinators are found dynamically via
     `isinstance(item, DataUpdateCoordinator)` (no fragile key filtering).
+  - It gets NO `device_info` on purpose: with a device it would inherit the
+    device name (titled after the first service) as a prefix and read like a
+    single-host sensor. Without a device the translated name is shown as-is
+    (note: `translation_key` only resolves when `has_entity_name` is True —
+    verified against HA 2024.6 `_name_internal`).
   - `unknown` hosts count as NOT down (no false alarms during internet outage
     or before first data); `is_on` is only False if at least one real `down`.
   - Attributes: `down_hosts`, `unknown_hosts`, `total_monitored`,
     `problem_count`, `internet_connected` (only once any canary has run).
 - `switch.py` — per service a `DomainMonitorSwitch` (Monitor on/off) calling
-  `coordinator.set_enabled()`.
+  `coordinator.set_enabled()`; extends `RestoreEntity` so a paused service
+  stays paused across HA restarts.
 - `number.py` — interval/timeout/retries/slow-threshold entities
   (entity_category CONFIG); write into `entry.options`, which triggers a
   reload via `update_listener`.
 - `button.py` — one "Check <service> Now" button per service
   (`CoordinatorEntity`), triggers `async_request_refresh`.
-- `config_flow.py` — user flow creates an entry with one service; options
-  flow = tuning form + multi-step service editor (`init` → `manage` →
-  `service` with delete checkbox). Shared schemas `_tuning_schema()` /
-  `_service_fields_schema()` with validation: host must match
-  `^[A-Za-z0-9._-]+$` or bracketed IPv6, port 1–65535, interval 10–3600,
-  timeout 1–60, retries 1–10, slow threshold 0–10000.
+- `config_flow.py` — user flow creates an entry with one service. The
+  options flow is a menu-driven editor: `init` (tuning + "edit services"
+  checkbox) → `manage` = BUTTON MENU (`async_show_menu`: add/edit/delete/done,
+  labels translated via `menu_options` in strings) with the CURRENT service
+  list rendered as Markdown in the description (`{services_list}` placeholder)
+  → `edit_service`/`delete_service` (dropdown) or `add_service` → `service`
+  form → back to `manage`. Changes go to a WORKING COPY (`self._services`);
+  nothing is saved until `done` (one single entry reload at the end). Shared
+  schemas `_tuning_schema()` / `_service_fields_schema()` with validation:
+  host must match `^[A-Za-z0-9._-]+$` or bracketed IPv6, port 1–65535,
+  interval 10–3600, timeout 1–60, retries 1–10, slow threshold 0–10000.
+  NEVER put pseudo entries like "+ Add"/"- Done -" into a `vol.In` dropdown —
+  they cannot be translated; use menu buttons instead.
 - `diagnostics.py` — `async_get_config_entry_diagnostics` with keyword
   regexes redacted (`async_redact_data`).
 - `device.py` — `build_device_info(entry)`: one device per entry
@@ -203,8 +229,8 @@ In CI (ubuntu): `pytest tests -v` (pytest-homeassistant-custom-component).
   shared either.
 - The monitor switch is runtime-only: after an HA restart all services are
   active again (by design; document if users ask).
-- `smoke_local.py` stubs homeassistant modules — keep it in sync if the
-  coordinator's imports change.
-- Options flow handler keeps the entry in `self._entry` (older pattern);
-  newer HA offers `self.config_entry` — works, deprecation warning only.
+- `smoke_local.py` / `simulate_*.py` stub homeassistant modules — keep them
+  in sync if the coordinator's or the flow's imports change.
+- The options flow handler uses `self.config_entry` (framework-set property,
+  HA 2024.3+) — do not go back to storing the entry in the constructor.
 - The user communicates in German; release notes and code are in English.

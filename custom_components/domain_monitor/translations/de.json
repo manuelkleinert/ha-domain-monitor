@@ -31,7 +31,26 @@
       },
       "manage": {
         "title": "Dienste",
-        "description": "Wähle einen Dienst zum Bearbeiten, füge einen neuen hinzu oder wähle 'Fertig'."
+        "description": "Aktuell überwachte Dienste:\n\n{services_list}",
+        "menu_options": {
+          "add_service": "+ Neuen Dienst hinzufügen",
+          "edit_service": "Dienst bearbeiten",
+          "delete_service": "Dienst löschen",
+          "done": "Fertig"
+        }
+      },
+      "edit_service": {
+        "title": "Dienst bearbeiten",
+        "data": {
+          "service": "Dienst"
+        }
+      },
+      "delete_service": {
+        "title": "Dienst löschen",
+        "description": "Wähle den Dienst, der gelöscht werden soll.",
+        "data": {
+          "service": "Dienst"
+        }
       },
       "service": {
         "title": "Dienst",
@@ -39,8 +58,7 @@
           "host": "Hostname / IP",
           "type": "Prüf-Typ",
           "port": "Port (Standard: 443 HTTPS / 80 HTTP)",
-          "keyword": "Suchwort / Regex (optional)",
-          "delete": "Diesen Dienst löschen"
+          "keyword": "Suchwort / Regex (optional)"
         }
       }
     },
@@ -53,6 +71,51 @@
     "invalid_service": {
       "title": "Ungültige Dienst-Konfiguration",
       "description": "Folgende Dienste konnten nicht ausgewertet werden und werden nicht überwacht:\n\n{services}"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "{host} Status"
+      },
+      "response_time": {
+        "name": "{host} Antwortzeit"
+      },
+      "certificate": {
+        "name": "{host} Zertifikat"
+      }
+    },
+    "binary_sensor": {
+      "connected": {
+        "name": "{host} Verbunden"
+      },
+      "overall_status": {
+        "name": "Gesamtstatus überwachter Domains"
+      }
+    },
+    "switch": {
+      "monitor": {
+        "name": "{host} Überwachung"
+      }
+    },
+    "button": {
+      "check_button": {
+        "name": "{host} jetzt prüfen"
+      }
+    },
+    "number": {
+      "interval": {
+        "name": "Prüfintervall"
+      },
+      "timeout": {
+        "name": "Zeitüberschreitung"
+      },
+      "retries": {
+        "name": "Wiederholungen"
+      },
+      "slow_threshold": {
+        "name": "Schwelle für 'langsam'"
+      }
     }
   }
 }

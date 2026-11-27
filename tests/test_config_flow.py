@@ -1,10 +1,8 @@
 from homeassistant import config_entries, setup
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.domain_monitor.const import DOMAIN
-from custom_components.domain_monitor.config_flow import (
-    DomainMonitorOptionsFlowHandler,
-    _resolve_port,
-)
+from custom_components.domain_monitor.config_flow import _resolve_port
 
 
 async def test_user_flow_creates_json_services(hass):
@@ -93,7 +91,36 @@ def test_resolve_port():
     assert _resolve_port("tcp", 8080) == 8080
 
 
-def test_options_flow_init_stores_entry():
-    entry = type("Entry", (), {"entry_id": "x", "data": {}, "options": {}, "title": "t"})()
-    handler = DomainMonitorOptionsFlowHandler(entry)
-    assert handler._entry is entry
+async def test_options_flow_shows_init_form(hass):
+    await setup.async_setup_component(hass, "http", {})
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "services": [{"host": "example.com", "type": "https", "port": 443, "keyword": None}],
+            "interval": 120,
+        },
+        options={},
+        title="example.com (https)",
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == "form"
+    assert result["step_id"] == "init"
+
+    # Quick save (no service editing) must keep the entry usable and store tuning
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            "edit_services": False,
+            "interval": 300,
+            "timeout": 10,
+            "retries": 3,
+            "slow_threshold_ms": 2000,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] == "create_entry"
+    assert result["data"]["interval"] == 300

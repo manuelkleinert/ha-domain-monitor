@@ -35,7 +35,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 
 class DomainMonitorBaseNumber(NumberEntity):
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
     _attr_mode = NumberMode.BOX
 
@@ -56,10 +56,10 @@ class DomainMonitorIntervalNumber(DomainMonitorBaseNumber):
     _attr_native_min_value = MIN_INTERVAL
     _attr_native_max_value = MAX_INTERVAL
     _attr_native_step = 10
+    _attr_translation_key = "interval"
 
     def __init__(self, coordinator, entry):
         super().__init__(coordinator, entry)
-        self._attr_name = f"{entry.title} Interval" if entry.title else "Domain Monitor Interval"
         self._attr_unique_id = f"domain_monitor_{entry.entry_id}_interval"
         self.option_key = "interval"
 
@@ -73,10 +73,10 @@ class DomainMonitorTimeoutNumber(DomainMonitorBaseNumber):
     _attr_native_min_value = MIN_TIMEOUT
     _attr_native_max_value = MAX_TIMEOUT
     _attr_native_step = 1
+    _attr_translation_key = "timeout"
 
     def __init__(self, coordinator, entry):
         super().__init__(coordinator, entry)
-        self._attr_name = f"{entry.title} Timeout" if entry.title else "Domain Monitor Timeout"
         self._attr_unique_id = f"domain_monitor_{entry.entry_id}_timeout"
         self.option_key = "timeout"
 
@@ -90,10 +90,10 @@ class DomainMonitorRetriesNumber(DomainMonitorBaseNumber):
     _attr_native_min_value = MIN_RETRIES
     _attr_native_max_value = MAX_RETRIES
     _attr_native_step = 1
+    _attr_translation_key = "retries"
 
     def __init__(self, coordinator, entry):
         super().__init__(coordinator, entry)
-        self._attr_name = f"{entry.title} Retries" if entry.title else "Domain Monitor Retries"
         self._attr_unique_id = f"domain_monitor_{entry.entry_id}_retries"
         self.option_key = "retries"
 
@@ -103,14 +103,14 @@ class DomainMonitorRetriesNumber(DomainMonitorBaseNumber):
 
 
 class DomainMonitorSlowThresholdNumber(DomainMonitorBaseNumber):
-    _attr_icon = "mdi:tachometer"
+    _attr_icon = "mdi:gauge"
     _attr_native_min_value = MIN_SLOW_THRESHOLD
     _attr_native_max_value = MAX_SLOW_THRESHOLD
     _attr_native_step = 100
+    _attr_translation_key = "slow_threshold"
 
     def __init__(self, coordinator, entry):
         super().__init__(coordinator, entry)
-        self._attr_name = f"{entry.title} Slow Threshold" if entry.title else "Domain Monitor Slow Threshold"
         self._attr_unique_id = f"domain_monitor_{entry.entry_id}_slow_threshold"
         self.option_key = "slow_threshold_ms"
 

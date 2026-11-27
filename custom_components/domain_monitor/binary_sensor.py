@@ -34,11 +34,13 @@ class DomainServiceBinarySensor(CoordinatorEntity, BinarySensorEntity):
     """Connectivity binary sensor for a single service."""
 
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_has_entity_name = True
 
     def __init__(self, coordinator, service: dict):
         super().__init__(coordinator)
         self.service = service
-        self._attr_name = f"{_service_label(service)} Connected"
+        self._attr_translation_key = "connected"
+        self._attr_translation_placeholders = {"host": _service_label(service)}
         self._attr_unique_id = f"{_unique_id_base(coordinator, service)}_connected"
         self._attr_device_info = build_device_info(coordinator.entry)
         self._attr_icon = "mdi:server-network"
@@ -56,10 +58,17 @@ class DomainServiceBinarySensor(CoordinatorEntity, BinarySensorEntity):
 
 
 class DomainMonitorTotalStatus(CoordinatorEntity, BinarySensorEntity):
-    """Binary sensor that is ON unless one of the monitored services is down."""
+    """Binary sensor that is ON unless one of the monitored services is down.
 
-    _attr_name = "Overall Domain Status"
+    This sensor spans ALL entries and therefore gets NO device_info: with a
+    device it would inherit the device's name (titled after the first
+    service) as a prefix in its friendly name. Without a device the
+    translated name ("Overall Domain Status") is shown as-is.
+    """
+
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_has_entity_name = True
+    _attr_translation_key = "overall_status"
     _attr_unique_id = "domain_monitor_overall_status"
     _attr_icon = "mdi:radar"
 

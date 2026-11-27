@@ -31,7 +31,26 @@
       },
       "manage": {
         "title": "Services",
-        "description": "Select a service to edit it, add a new one, or choose 'Done'."
+        "description": "Currently monitored services:\n\n{services_list}",
+        "menu_options": {
+          "add_service": "+ Add new service",
+          "edit_service": "Edit a service",
+          "delete_service": "Delete a service",
+          "done": "Done"
+        }
+      },
+      "edit_service": {
+        "title": "Edit service",
+        "data": {
+          "service": "Service"
+        }
+      },
+      "delete_service": {
+        "title": "Delete service",
+        "description": "Select the service you want to delete.",
+        "data": {
+          "service": "Service"
+        }
       },
       "service": {
         "title": "Service",
@@ -39,8 +58,7 @@
           "host": "Hostname / IP",
           "type": "Check Type",
           "port": "Port (default: 443 HTTPS / 80 HTTP)",
-          "keyword": "Keyword / Regex (optional)",
-          "delete": "Delete this service"
+          "keyword": "Keyword / Regex (optional)"
         }
       }
     },
@@ -53,6 +71,51 @@
     "invalid_service": {
       "title": "Invalid service configuration",
       "description": "The following service entries could not be parsed and are not being monitored:\n\n{services}"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "{host} Status"
+      },
+      "response_time": {
+        "name": "{host} Response Time"
+      },
+      "certificate": {
+        "name": "{host} Certificate"
+      }
+    },
+    "binary_sensor": {
+      "connected": {
+        "name": "{host} Connected"
+      },
+      "overall_status": {
+        "name": "Overall Domain Status"
+      }
+    },
+    "switch": {
+      "monitor": {
+        "name": "{host} Monitoring"
+      }
+    },
+    "button": {
+      "check_button": {
+        "name": "Check {host} now"
+      }
+    },
+    "number": {
+      "interval": {
+        "name": "Interval"
+      },
+      "timeout": {
+        "name": "Timeout"
+      },
+      "retries": {
+        "name": "Retries"
+      },
+      "slow_threshold": {
+        "name": "Slow threshold"
+      }
     }
   }
 }
