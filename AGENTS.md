@@ -219,6 +219,7 @@ installable on this Windows machine); locally use the stubbed smoke tests:
 python tests\smoke_local.py      # pure logic without homeassistant installed
 python tests\simulate_cycle.py   # full update cycle with fake session (stubs HA)
 python tests\simulate_flow.py    # options-flow editor end-to-end (stubs HA)
+python tests\live_check.py       # REAL network: aiohttp installed locally, checks the real hosts/canaries/certs
 python -m ruff check custom_components tests
 python -m py_compile (Get-ChildItem custom_components\domain_monitor -Filter *.py).FullName
 python -c "import json; [json.load(open(p, encoding='utf-8')) for p in ['custom_components/domain_monitor/manifest.json','hacs.json','custom_components/domain_monitor/strings.json','custom_components/domain_monitor/translations/de.json','custom_components/domain_monitor/translations/en.json']]"
