@@ -1,4 +1,4 @@
-from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -63,7 +63,7 @@ class DomainSensor(CoordinatorEntity):
         return attributes
 
 
-class DomainResponseTimeSensor(CoordinatorEntity):
+class DomainResponseTimeSensor(CoordinatorEntity, SensorEntity):
     """Response time of the last check in milliseconds (graphable)."""
 
     _attr_has_entity_name = True
@@ -88,7 +88,7 @@ class DomainResponseTimeSensor(CoordinatorEntity):
         return round(data["response_ms"])
 
 
-class DomainCertificateSensor(CoordinatorEntity):
+class DomainCertificateSensor(CoordinatorEntity, SensorEntity):
     """Days until the TLS certificate of an HTTPS service expires."""
 
     _attr_has_entity_name = True
