@@ -166,7 +166,13 @@ class DomainMonitorOptionsFlowHandler(config_entries.OptionsFlow):
 
         return self.async_show_menu(
             step_id="manage",
-            menu_options=["add_service", "edit_service", "delete_service", "done"],
+            menu_options=[
+                "add_service",
+                "edit_service",
+                "delete_service",
+                "settings",
+                "done",
+            ],
             description_placeholders={"services_list": self._services_list_markdown()},
         )
 

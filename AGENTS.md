@@ -152,14 +152,17 @@ dicts** (since ConfigFlow.VERSION 2; old string entries are migrated by
   cannot mix form fields and action buttons, so a checkbox was replaced by
   this menu, do not reintroduce a checkbox): "Settings" → `settings` form
   (tuning, saves immediately), "Manage services" → `manage` = BUTTON MENU
-  (add/edit/delete/done) with the CURRENT service list rendered as Markdown
-  in the description (`{services_list}` placeholder) →
-  `edit_service`/`delete_service` (dropdown) or `add_service` → `service`
-  form → back to `manage`. Changes go to a WORKING COPY (`self._services`);
-  nothing is saved until `done` (one single entry reload at the end). Shared
-  schemas `_tuning_schema()` / `_service_fields_schema()` with validation:
-  host must match `^[A-Za-z0-9._-]+$` or bracketed IPv6, port 1–65535,
-  interval 10–3600, timeout 1–60, retries 1–10, slow threshold 0–10000.
+  (add/edit/delete/**settings-back**/done → label "Save") with the CURRENT
+  service list rendered as Markdown in the description (`{services_list}`
+  placeholder) → `edit_service`/`delete_service` (dropdown) or
+  `add_service` → `service` form → back to `manage`. "Settings" returns to
+  the main menu KEEPING the working copy (the dialog X always aborts the
+  whole flow — that is frontend behavior and not changeable). Changes go to
+  a WORKING COPY (`self._services`); nothing is saved until `done` (one
+  single entry reload at the end). Shared schemas `_tuning_schema()` /
+  `_service_fields_schema()` with validation: host must match
+  `^[A-Za-z0-9._-]+$` or bracketed IPv6, port 1–65535, interval 10–3600,
+  timeout 1–60, retries 1–10, slow threshold 0–10000.
   NEVER put pseudo entries like "+ Add"/"- Done -" into a `vol.In` dropdown —
   they cannot be translated; use menu buttons instead.
 - `diagnostics.py` — `async_get_config_entry_diagnostics` with keyword

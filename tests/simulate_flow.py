@@ -146,8 +146,18 @@ async def run():
     # 3) manage path: menu with the service list
     result = await handler.async_step_manage()
     check("manage: shows menu", result["type"] == "menu" and result["step_id"] == "manage")
-    check("manage: has 4 buttons", set(result["menu_options"]) == {"add_service", "edit_service", "delete_service", "done"})
+    check("manage: has 5 buttons", set(result["menu_options"]) == {"add_service", "edit_service", "delete_service", "settings", "done"})
     check("manage: list in description", "a.com (https:443)" in result["description_placeholders"]["services_list"])
+
+    # 3a) back to settings keeps the working copy alive
+    result = await handler.async_step_add_service()
+    result = await handler.async_step_service(
+        {"host": "draft.com", "type": "https", "port": 443, "keyword": ""}
+    )
+    result = await handler.async_step_settings()
+    check("back: settings shows form", result["type"] == "form" and result["step_id"] == "settings")
+    result = await handler.async_step_manage()
+    check("back: working copy intact", "draft.com (https:443)" in handler._services_list_markdown())
 
     # 4) add a new service
     result = await handler.async_step_add_service()
@@ -189,13 +199,16 @@ async def run():
     check("delete second-to-last: allowed", result["type"] == "menu")
     result = await handler.async_step_delete_service()
     result = await handler.async_step_delete_service({"service": "c.com:https:443"})
+    check("delete second-to-last 2: allowed", result["type"] == "menu")
+    result = await handler.async_step_delete_service()
+    result = await handler.async_step_delete_service({"service": "draft.com:https:443"})
     check("delete last: blocked", result["errors"].get("base") == "at_least_one")
 
     # 9) done -> saves working list, keeps the tuning from the entry
     result = await handler.async_step_done()
     check("done: create_entry", result["type"] == "create_entry")
     check("done: services saved", len(result["data"]["services"]) == 1)
-    check("done: entry title updated", hass.updated[-1][1].get("title") == "c.com (https:443)")
+    check("done: entry title updated", hass.updated[-1][1].get("title") == "draft.com (https:443)")
 
 
 asyncio.run(run())

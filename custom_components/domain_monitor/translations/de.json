@@ -42,7 +42,8 @@
           "add_service": "+ Neuen Dienst hinzufügen",
           "edit_service": "Dienst bearbeiten",
           "delete_service": "Dienst löschen",
-          "done": "Fertig"
+          "settings": "Einstellungen",
+          "done": "Speichern"
         }
       },
       "edit_service": {

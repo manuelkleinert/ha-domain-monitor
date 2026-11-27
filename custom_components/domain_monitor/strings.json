@@ -42,7 +42,8 @@
           "add_service": "+ Add new service",
           "edit_service": "Edit a service",
           "delete_service": "Delete a service",
-          "done": "Done"
+          "settings": "Settings",
+          "done": "Save"
         }
       },
       "edit_service": {
