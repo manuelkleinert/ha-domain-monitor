@@ -8,18 +8,51 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN, OVERALL_SENSOR_KEY
+from .device import build_device_info
+from .sensor import _service_label, _unique_id_base
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # Der globale Sensor wird nur ein einziges Mal erzeugt; die Zuordnung zum
-    # besitzenden Entry wird gemerkt, damit er nach dem Entfernen des Entries
-    # von einem verbleibenden Entry neu angelegt werden kann.
+    entities = [
+        DomainServiceBinarySensor(coordinator, service)
+        for service in coordinator.services
+    ]
+
+    # The global overall sensor is created only once; the owning entry is
+    # remembered so it can be re-created on another entry after unload.
     if not hass.data[DOMAIN].get(OVERALL_SENSOR_KEY):
         entity = DomainMonitorTotalStatus(coordinator)
         hass.data[DOMAIN][OVERALL_SENSOR_KEY] = (entry.entry_id, entity)
-        async_add_entities([entity])
+        entities.append(entity)
+
+    async_add_entities(entities)
+
+
+class DomainServiceBinarySensor(CoordinatorEntity, BinarySensorEntity):
+    """Connectivity binary sensor for a single service."""
+
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+
+    def __init__(self, coordinator, service: dict):
+        super().__init__(coordinator)
+        self.service = service
+        self._attr_name = f"{_service_label(service)} Connected"
+        self._attr_unique_id = f"{_unique_id_base(coordinator, service)}_connected"
+        self._attr_device_info = build_device_info(coordinator.entry)
+        self._attr_icon = "mdi:server-network"
+
+    @property
+    def available(self):
+        """Be unavailable while the state is unknown (startup / no internet)."""
+        data = self.coordinator.data.get(self.service["id"])
+        return bool(data) and data.get("status") != "unknown"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data.get(self.service["id"], {})
+        return data.get("status") == "up"
 
 
 class DomainMonitorTotalStatus(CoordinatorEntity, BinarySensorEntity):
@@ -28,6 +61,11 @@ class DomainMonitorTotalStatus(CoordinatorEntity, BinarySensorEntity):
     _attr_name = "Overall Domain Status"
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_unique_id = "domain_monitor_overall_status"
+    _attr_icon = "mdi:radar"
+
+    def __init__(self, coordinator):
+        super().__init__(coordinator)
+        self._attr_device_info = build_device_info(coordinator.entry)
 
     def _coordinators(self):
         domain_data = self.hass.data.get(DOMAIN, {})
@@ -67,12 +105,13 @@ class DomainMonitorTotalStatus(CoordinatorEntity, BinarySensorEntity):
             if not coordinator.data:
                 continue
             total_count += len(coordinator.data)
-            for host, result in coordinator.data.items():
+            for result in coordinator.data.values():
                 status = result.get("status")
+                label = f"{result.get('host')} ({result.get('type')}:{result.get('port')})"
                 if status == "down":
-                    down_hosts.append(host)
+                    down_hosts.append(label)
                 elif status == "unknown":
-                    unknown_hosts.append(host)
+                    unknown_hosts.append(label)
 
         flags = [
             coordinator.internet_ok

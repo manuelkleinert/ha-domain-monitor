@@ -17,3 +17,25 @@ CONNECTIVITY_CHECKS = [
     {"type": "http", "url": "http://connectivity-check.ubuntu.com"},
     {"type": "tcp", "host": "1.1.1.1", "port": 443},
 ]
+
+# Only the first N bytes of a response body are scanned for the keyword
+# regex, and the regex itself runs in an executor thread so a pathological
+# pattern can never block the event loop.
+KEYWORD_MAX_BODY_BYTES = 1_000_000
+
+# Limits enforced by the config/options flow.
+MIN_INTERVAL = 10
+MAX_INTERVAL = 3600
+MIN_TIMEOUT = 1
+MAX_TIMEOUT = 60
+MIN_RETRIES = 1
+MAX_RETRIES = 10
+MIN_SLOW_THRESHOLD = 0
+MAX_SLOW_THRESHOLD = 10000
+DEFAULT_SLOW_THRESHOLD = 2000
+
+# TLS certificate expiry information is refreshed at most this often.
+CERT_EXPIRY_CACHE = 12 * 3600
+
+# Event fired on the HA event bus whenever a service changes status.
+EVENT_STATUS_CHANGED = "domain_monitor_event"

@@ -3,12 +3,16 @@
     "step": {
       "user": {
         "title": "Domain Monitor",
-        "description": "Prüfe die Erreichbarkeit deiner Webseite oder deines Servers. Du kannst optional ein Suchwort oder einen regulären Ausdruck (Regex) angeben, um den Inhalt zu verifizieren.",
+        "description": "Prüfe die Erreichbarkeit einer Webseite oder eines Servers. Optional kannst du ein Suchwort oder einen regulären Ausdruck (Regex) angeben, um den Inhalt zu verifizieren.",
         "data": {
           "host": "Hostname / IP",
           "type": "Prüf-Typ",
-          "port": "Port",
-          "keyword": "Suchwort / Regex (optional)"
+          "port": "Port (Standard: 443 HTTPS / 80 HTTP)",
+          "keyword": "Suchwort / Regex (optional)",
+          "interval": "Prüfintervall (Sekunden)",
+          "timeout": "Zeitüberschreitung (Sekunden)",
+          "retries": "Wiederholungen",
+          "slow_threshold_ms": "Schwelle für 'langsam' (ms, 0 = aus)"
         }
       }
     }
@@ -18,9 +22,37 @@
       "init": {
         "title": "Einstellungen",
         "data": {
-          "services": "Dienste (host:typ oder host:tcp:port)"
+          "edit_services": "Dienste bearbeiten",
+          "interval": "Prüfintervall (Sekunden)",
+          "timeout": "Zeitüberschreitung (Sekunden)",
+          "retries": "Wiederholungen",
+          "slow_threshold_ms": "Schwelle für 'langsam' (ms, 0 = aus)"
+        }
+      },
+      "manage": {
+        "title": "Dienste",
+        "description": "Wähle einen Dienst zum Bearbeiten, füge einen neuen hinzu oder wähle 'Fertig'."
+      },
+      "service": {
+        "title": "Dienst",
+        "data": {
+          "host": "Hostname / IP",
+          "type": "Prüf-Typ",
+          "port": "Port (Standard: 443 HTTPS / 80 HTTP)",
+          "keyword": "Suchwort / Regex (optional)",
+          "delete": "Diesen Dienst löschen"
         }
       }
+    },
+    "error": {
+      "at_least_one": "Mindestens ein Dienst muss übrig bleiben.",
+      "duplicate_service": "Ein Dienst mit diesem Host, Typ und Port existiert bereits."
+    }
+  },
+  "issues": {
+    "invalid_service": {
+      "title": "Ungültige Dienst-Konfiguration",
+      "description": "Folgende Dienste konnten nicht ausgewertet werden und werden nicht überwacht:\n\n{services}"
     }
   }
 }

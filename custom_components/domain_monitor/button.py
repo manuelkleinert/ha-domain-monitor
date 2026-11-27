@@ -1,28 +1,30 @@
 from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
 from .const import DOMAIN
+from .device import build_device_info
+from .sensor import _service_label, _unique_id_base
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    
-    entities = []
-    for service in coordinator.services:
-        entities.append(DomainMonitorButton(coordinator, service))
-    
+
+    entities = [
+        DomainMonitorButton(coordinator, service)
+        for service in coordinator.services
+    ]
+
     async_add_entities(entities)
 
+
 class DomainMonitorButton(CoordinatorEntity, ButtonEntity):
-    def __init__(self, coordinator, service):
+    def __init__(self, coordinator, service: dict):
         super().__init__(coordinator)
         self.service = service
-        self.host = service["host"]
-        
-        self._attr_name = f"Check {self.host} Now"
+        self._attr_name = f"Check {_service_label(service)} Now"
+        self._attr_unique_id = f"{_unique_id_base(coordinator, service)}_check_button"
+        self._attr_device_info = build_device_info(coordinator.entry)
         self._attr_icon = "mdi:refresh"
-
-    @property
-    def unique_id(self):
-        return f"{self.coordinator.entry.entry_id}_{self.host}_check_button"
 
     async def async_press(self) -> None:
         """Handle the button press."""

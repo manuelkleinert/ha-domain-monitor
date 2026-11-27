@@ -3,12 +3,16 @@
     "step": {
       "user": {
         "title": "Domain Monitor",
-        "description": "Check the availability of your website or server. Optionally, you can specify a keyword or Regex to verify the content.",
+        "description": "Check the availability of a website or server. Optionally, you can specify a keyword or Regex to verify the content.",
         "data": {
           "host": "Hostname / IP",
           "type": "Check Type",
-          "port": "Port",
-          "keyword": "Keyword / Regex (optional)"
+          "port": "Port (default: 443 HTTPS / 80 HTTP)",
+          "keyword": "Keyword / Regex (optional)",
+          "interval": "Check interval (seconds)",
+          "timeout": "Timeout (seconds)",
+          "retries": "Retries",
+          "slow_threshold_ms": "Slow threshold (ms, 0 = off)"
         }
       }
     }
@@ -18,9 +22,37 @@
       "init": {
         "title": "Settings",
         "data": {
-          "services": "Services (host:type or host:tcp:port)"
+          "edit_services": "Edit services",
+          "interval": "Check interval (seconds)",
+          "timeout": "Timeout (seconds)",
+          "retries": "Retries",
+          "slow_threshold_ms": "Slow threshold (ms, 0 = off)"
+        }
+      },
+      "manage": {
+        "title": "Services",
+        "description": "Select a service to edit it, add a new one, or choose 'Done'."
+      },
+      "service": {
+        "title": "Service",
+        "data": {
+          "host": "Hostname / IP",
+          "type": "Check Type",
+          "port": "Port (default: 443 HTTPS / 80 HTTP)",
+          "keyword": "Keyword / Regex (optional)",
+          "delete": "Delete this service"
         }
       }
+    },
+    "error": {
+      "at_least_one": "At least one service must remain.",
+      "duplicate_service": "A service with this host, type and port already exists."
+    }
+  },
+  "issues": {
+    "invalid_service": {
+      "title": "Invalid service configuration",
+      "description": "The following service entries could not be parsed and are not being monitored:\n\n{services}"
     }
   }
 }

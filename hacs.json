@@ -2,6 +2,6 @@
   "name": "Domain Monitor",
   "content_in_root": false,
   "country": ["CH"],
-  "homeassistant": "2024.1.0",
+  "homeassistant": "2024.6.0",
   "render_readme": true
 }
