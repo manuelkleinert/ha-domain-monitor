@@ -206,16 +206,24 @@ dicts** (since ConfigFlow.VERSION 2; old string entries are migrated by
 ## Verification
 
 PowerShell, repo root. Full pytest runs only in CI on Linux (HA is not
-installable on this Windows machine); locally use the stubbed smoke test:
+installable on this Windows machine); locally use the stubbed smoke tests:
 
 ```
 python tests\smoke_local.py      # pure logic without homeassistant installed
+python tests\simulate_cycle.py   # full update cycle with fake session (stubs HA)
+python tests\simulate_flow.py    # options-flow editor end-to-end (stubs HA)
 python -m ruff check custom_components tests
 python -m py_compile (Get-ChildItem custom_components\domain_monitor -Filter *.py).FullName
 python -c "import json; [json.load(open(p, encoding='utf-8')) for p in ['custom_components/domain_monitor/manifest.json','hacs.json','custom_components/domain_monitor/strings.json','custom_components/domain_monitor/translations/de.json','custom_components/domain_monitor/translations/en.json']]"
 ```
 
 In CI (ubuntu): `pytest tests -v` (pytest-homeassistant-custom-component).
+Test setup notes: `pytest.ini` sets `asyncio_mode = auto` (async tests run
+without markers); `tests/conftest.py` puts the REPO ROOT on sys.path (do not
+re-add per-file sys.path hacks — one inserted the wrong dir once and CI
+failed to collect); menu steps are navigated with
+`async_configure(flow_id, {"next_step_id": "step_name"})` (exactly how the
+frontend sends it, verified against data_entry_flow.py 2024.6).
 
 ## Release process
 

@@ -1,10 +1,5 @@
-import sys
-from pathlib import Path
-from unittest.mock import AsyncMock, patch
-
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components"))
+from unittest.mock import AsyncMock, patch
 
 from custom_components.domain_monitor.const import EVENT_STATUS_CHANGED
 from custom_components.domain_monitor.coordinator import (

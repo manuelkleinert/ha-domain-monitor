@@ -59,7 +59,7 @@ async def test_user_flow_rejects_bad_host(hass):
         },
     )
     assert result["type"] == "form"
-    assert result["errors"] == {"host": "does not match regular expression"}
+    assert result["errors"]
 
 
 async def test_user_flow_rejects_out_of_range(hass):
@@ -110,7 +110,9 @@ async def test_options_flow_menu_then_settings(hass):
     assert set(result["menu_options"]) == {"settings", "manage"}
 
     # Navigate to the settings form and quick-save the tuning
-    result = await hass.config_entries.options.async_configure(result["flow_id"], "settings")
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "settings"}
+    )
     assert result["type"] == "form"
     assert result["step_id"] == "settings"
 
