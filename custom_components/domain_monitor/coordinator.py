@@ -268,17 +268,19 @@ class DomainDataCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         results = {}
 
-        # While the last canary check said there is no internet, re-run only
-        # the cheap connectivity check until the internet is back instead of
-        # burning through timeouts and retries on every monitored host.
-        if self._internet_ok is False and not await self._async_check_internet():
-            for service in self.services:
-                self._store(service, self._no_internet_result(service), results)
-            return results
+        # While the last canary check said there is no internet, the hosts are
+        # still checked - but with a SINGLE attempt each instead of all
+        # retries (no long timeouts). If a single host check succeeds, the
+        # canary was wrong (e.g. blocked canary endpoints) and we recover;
+        # if everything fails, the canary was right and the hosts are
+        # reported as unknown instead of down.
+        offline_mode = self._internet_ok is False
+        attempts = 1 if offline_mode else None
 
         session = async_get_clientsession(self.hass)
 
-        await self._async_refresh_certificates()
+        if not offline_mode:
+            await self._async_refresh_certificates()
 
         tasks = []
         task_services = []
@@ -288,10 +290,10 @@ class DomainDataCoordinator(DataUpdateCoordinator):
             if sid in self.disabled:
                 self._store(service, self._disabled_result(service), results)
             elif service["type"] in ("http", "https"):
-                tasks.append(self.check_http(session, service))
+                tasks.append(self.check_http(session, service, attempts=attempts))
                 task_services.append(service)
             else:
-                tasks.append(self.check_tcp(service))
+                tasks.append(self.check_tcp(service, attempts=attempts))
                 task_services.append(service)
 
         responses = await asyncio.gather(*tasks)
@@ -303,6 +305,14 @@ class DomainDataCoordinator(DataUpdateCoordinator):
             for item in failed:
                 item["status"] = "unknown"
                 item["no_internet"] = True
+        elif not failed and offline_mode:
+            # Hosts answer while the canaries do not: the canary endpoints are
+            # misleading (blocked/filtered), internet is actually fine.
+            self._internet_ok = True
+            _LOGGER.info(
+                "Monitored hosts are reachable while the canary checks fail - "
+                "treating the canary as misleading and resuming regular checks"
+            )
 
         for service, item in zip(task_services, responses):
             self._store(service, item, results)
@@ -345,12 +355,6 @@ class DomainDataCoordinator(DataUpdateCoordinator):
             "code": None,
             "response_ms": None,
             "time": datetime.now(UTC),
-        }
-
-    def _no_internet_result(self, service: dict) -> dict:
-        return {
-            **self._base_result(service),
-            "no_internet": True,
         }
 
     def _disabled_result(self, service: dict) -> dict:
@@ -471,13 +475,14 @@ class DomainDataCoordinator(DataUpdateCoordinator):
         self.cert_data[service["id"]] = info
         _LOGGER.debug("Certificate for %s expires at %s", host, info["expires_at"])
 
-    async def check_http(self, session, service: dict):
+    async def check_http(self, session, service: dict, attempts=None):
         host = service["host"]
         proto = service["type"]
         port = service["port"]
         keyword = service["keyword"]
+        max_attempts = attempts or self.retries
 
-        for attempt in range(self.retries):
+        for attempt in range(max_attempts):
             timestamp = int(datetime.now(UTC).timestamp())
 
             # Build URL with optional port
@@ -533,7 +538,7 @@ class DomainDataCoordinator(DataUpdateCoordinator):
                         return result
 
             except Exception as e:
-                _LOGGER.debug("Error checking %s (attempt %d/%d): %s", host, attempt + 1, self.retries, e)
+                _LOGGER.debug("Error checking %s (attempt %d/%d): %s", host, attempt + 1, max_attempts, e)
                 result = {
                     "host": host,
                     "type": proto,
@@ -545,16 +550,17 @@ class DomainDataCoordinator(DataUpdateCoordinator):
                     "time": start
                 }
 
-            if attempt < self.retries - 1:
+            if attempt < max_attempts - 1:
                 await asyncio.sleep(1)
 
         return result
 
-    async def check_tcp(self, service: dict):
+    async def check_tcp(self, service: dict, attempts=None):
         host = _socket_host(service["host"])
         port = service["port"]
+        max_attempts = attempts or self.retries
 
-        for attempt in range(self.retries):
+        for attempt in range(max_attempts):
             start = datetime.now(UTC)
 
             try:
@@ -563,7 +569,7 @@ class DomainDataCoordinator(DataUpdateCoordinator):
                     timeout=self.timeout,
                 )
             except Exception as e:
-                _LOGGER.debug("Error checking TCP %s:%s (attempt %d/%d): %s", host, port, attempt + 1, self.retries, e)
+                _LOGGER.debug("Error checking TCP %s:%s (attempt %d/%d): %s", host, port, attempt + 1, max_attempts, e)
                 result = {
                     "host": service["host"],
                     "type": "tcp",
@@ -594,7 +600,7 @@ class DomainDataCoordinator(DataUpdateCoordinator):
                     "time": start
                 }
 
-            if attempt < self.retries - 1:
+            if attempt < max_attempts - 1:
                 await asyncio.sleep(1)
 
         return result

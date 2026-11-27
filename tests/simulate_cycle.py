@@ -12,6 +12,7 @@ import sys
 import types
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -198,10 +199,18 @@ async def failing_fetch(service):
     pass
 
 
-async def down_http(session, service):
+async def down_http(session, service, attempts=None):
     return {
         "host": service["host"], "type": service["type"], "port": service["port"],
         "status": "down", "code": None, "response_ms": None, "slow": False,
+        "time": datetime.now(UTC),
+    }
+
+
+async def up_http(session, service, attempts=None):
+    return {
+        "host": service["host"], "type": service["type"], "port": service["port"],
+        "status": "up", "code": 200, "response_ms": 42, "slow": False,
         "time": datetime.now(UTC),
     }
 
@@ -213,6 +222,16 @@ coordinator._internet_ok = True
 results3 = asyncio.run(coordinator._async_update_data())
 coordinator.data = results3
 check("event: fired on up->down", len(fired_events) == 1, f"events={len(fired_events)}")  # a.com up->down; b.com already unknown (disabled)
+
+# canary-recovery: canary says offline but hosts answer -> self-heal
+fired_events.clear()
+coordinator._internet_ok = False
+coordinator.check_http = up_http
+coordinator._async_check_internet = AsyncMock(return_value=False)
+results4 = asyncio.run(coordinator._async_update_data())
+coordinator.data = results4
+check("recovery: host success overrides misleading canary",
+      coordinator._internet_ok is True and results4["a.com:https:443"]["status"] == "up")
 
 print()
 if failures:

@@ -16,6 +16,7 @@ CONNECTIVITY_CHECKS = [
     {"type": "http", "url": "http://clients3.google.com/generate_204"},
     {"type": "http", "url": "http://connectivity-check.ubuntu.com"},
     {"type": "tcp", "host": "1.1.1.1", "port": 443},
+    {"type": "tcp", "host": "8.8.8.8", "port": 443},
 ]
 
 # Only the first N bytes of a response body are scanned for the keyword

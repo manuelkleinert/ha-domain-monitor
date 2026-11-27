@@ -71,7 +71,8 @@ automation:
 ```
 
 ## Internet outage behavior
-- While HA is offline, monitored servers are NOT checked (no wasted timeouts/retries); only the cheap canary runs until the internet is back.
+- Before a failed check marks a server as `down`, Home Assistant verifies its own connectivity via canary checks (HTTP 204 endpoints + TCP checks to `1.1.1.1:443` and `8.8.8.8:443`). Without internet, services show `unknown` (attribute `no_internet: true`) instead of `down` — no false alarms in your automations.
+- While the outage lasts, monitored hosts are still checked with a single attempt per cycle (no retries burned) — so the integration recovers immediately and can never get stuck, even if the canary endpoints themselves are blocked (e.g. by ad blockers/DNS filtering).
 - The overall sensor stays `on` and exposes `internet_connected: false` and `unknown_hosts` attributes.
 
 ## Diagnostics

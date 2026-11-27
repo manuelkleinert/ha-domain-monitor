@@ -62,11 +62,13 @@ dicts** (since ConfigFlow.VERSION 2; old string entries are migrated by
 - `coordinator.py` — `DomainDataCoordinator(DataUpdateCoordinator)`:
   - Created with `config_entry=entry` (required by newer HA versions).
   - `_async_update_data()` update cycle:
-    1. If `_internet_ok is False` (last canary said offline): run ONLY the
-       canary again. Still offline → every service gets a cheap
-       `unknown`/`no_internet: true` result and the cycle ends (no timeouts,
-       no retries burned). Online again → fall through to normal checks.
-    2. Refresh stale certificates for HTTPS services (`_async_refresh_certificates`).
+    1. If `_internet_ok is False` (last canary said offline): OFFLINE MODE —
+       hosts are still checked every cycle but with a SINGLE attempt each
+       (`attempts=1`, no retries burned). If ANY host check succeeds, the
+       canary was misleading (blocked endpoints) and `_internet_ok` flips
+       back to True (self-heal). If all fail AND the canary still fails,
+       every service gets a cheap `unknown`/`no_internet: true` result.
+    2. Refresh stale certificates for HTTPS services (skipped while offline).
     3. Disabled services (switch off) get `unknown`/`enabled: false` without
        running checks; all others run in parallel (`asyncio.gather`).
        IMPORTANT: enabled services are collected in `task_services` alongside
@@ -99,7 +101,9 @@ dicts** (since ConfigFlow.VERSION 2; old string entries are migrated by
     any success = online. HTTP canaries must return EXACTLY status 204 —
     a captive portal answering 200/302 therefore counts as offline.
     Endpoints: `http://clients3.google.com/generate_204`,
-    `http://connectivity-check.ubuntu.com`, TCP `1.1.1.1:443`.
+    `http://connectivity-check.ubuntu.com`, TCP `1.1.1.1:443` and
+    TCP `8.8.8.8:443` (DNS-independent). A canary false alarm can never stick:
+    successful host checks overrule it (see update cycle step 1).
   - Certificates: `_async_fetch_certificate()` opens a TLS connection with
     `ssl.create_default_context()` (verification ON, `server_hostname` for
     SNI) and reads `getpeercert()`; `parse_peer_cert()` is a pure function
